@@ -12,6 +12,9 @@ import multiprocessing as mp
 from tqdm import tqdm
 from sklearn.neighbors import NearestNeighbors
 import csv
+from pymoo.factory import get_performance_indicator
+import os
+import pickle
 
 def chamfer_distance(x, y, metric='l2', direction='bi', subsample=True, n_max=250):
     """Chamfer distance between two point clouds
@@ -844,7 +847,11 @@ def PolyArea(x,y):
     """
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
-def evaluate_population(mechanisms,target):
+def hyper_volume(F,ref):
+    hv = get_performance_indicator("hv", ref_point=np.array(ref))
+    return hv.do(F)
+
+def evaluate_submission():
     
     # Get a solver instance
     solver = mechanism_solver()
@@ -852,31 +859,58 @@ def evaluate_population(mechanisms,target):
     # Get a solver normalizer
     normalizer = curve_normalizer(scale=False)
     
-    F = []
+    scores = []
     
-    for m in mechanisms:
-        C,x0,fixed_nodes,motor,target = from_1D_representation(m)
-        
-        # Solve
-        x_sol,f1,f2 = solver.solve_rev(200,x0,C,motor,fixed_nodes,False)
-
-        # Normalize
-        x_norm = normalizer.get_oriented(x_sol[:,target,:])
-
-        # Step 4: Rasterize
-        out_pc = rasterized_curve_coords(x_norm,500)
-
-        # Step 5: Compare
-        cd = chamfer_distance(out_pc,target,subsample=False)
-        material = solver.material(m['x0'],m['C'])
-        
-        F.append([cd,material])
     
-    F = np.array(F)
-    sorted_performance = F[np.argsort(F[:,1])]
-    sorted_performance = np.concatenate([sorted_performance,[[np.min(F[:,0]),6],[30,6],[30,np.min(F[:,1])]]])
+    target_curves = []
+
+    # Read every file separately and append to the list
+    for i in range(20):
+        if not os.path.exists('./data/%i.csv'%(i)):
+            raise IOError('Could not find %i.csv in the data folder'%(i))
+        target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
     
-    return PolyArea(sorted_performance[:,1],sorted_performance[:,0])
+    
+    for i in trange(20):
+        if os.path.exists('./results/%i.csv'%i):
+            
+            
+            
+            mechanisms = get_population_csv('./results/%i.csv'%i)
+            F = []
+            for m in mechanisms:
+                C,x0,fixed_nodes,motor,target = from_1D_representation(m)
+
+                # Solve
+                x_sol,f1,f2 = solver.solve_rev(200,x0,C,motor,fixed_nodes,False)
+                
+                if not f1 and not f2:
+                    # Normalize
+                    x_norm = normalizer.get_oriented(x_sol[:,target,:])
+
+                    # Step 4: Rasterize
+                    out_pc = rasterized_curve_coords(x_norm,500)
+
+                    # Step 5: Compare
+                    cd = chamfer_distance(out_pc,target_curves[i],subsample=False)
+                    material = solver.material(x0,C)
+                    
+                    if cd<=30 and material<=6.0:
+                        F.append([cd,material])
+            if len(F):            
+                scores.append(hyper_volume(np.array(F),[30,6.0]))
+            else:
+                scores.append(0)
+        else:
+            scores.append(0)
+    
+    print('Score Break Down:')
+    for i in range(20):
+        print('Curve %i: %f'%(i,scores[i]))
+    
+    print('Overall Score: %f'%(np.mean(scores)))
+    
+    return np.mean(scores)
 
 def to_final_represenation(C,x0,fixed_nodes,motor,target):
     """Get 1D representation of mechanism
@@ -982,6 +1016,3 @@ def get_population_csv(file_name):
         for row in csv_reader:
             population.append(np.array(row).astype(np.float32))
     return population
-
-def evaluate_results():
-    pass
