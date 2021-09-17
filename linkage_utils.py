@@ -1100,7 +1100,7 @@ def is_pareto_efficient(costs, return_mask = True):
     
     
 def visualize_pareto_front(mechanisms,F,target_curve):
-     """Draw Pareto Front in population and visualize mechanisms
+    """Draw Pareto Front in population and visualize mechanisms
     Parameters
     ----------
     mechanisms: numpy array [N,...]
