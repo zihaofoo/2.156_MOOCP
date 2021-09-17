@@ -191,8 +191,8 @@ def draw_mechanism(C,x0,fixed_nodes,motor):
         plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
         
     plt.axis('equal')
-    plt.xlim([0,1])
-    plt.ylim([0,1])
+    plt.xlim([-0.1,1.1])
+    plt.ylim([-0.1,1.1])
     
 def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
     """Draw and simulate 2D planar mechanism and plot the traces for all nodes
@@ -229,8 +229,8 @@ def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
         ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
         
     ax.axis('equal')
-    ax.set_xlim([0,1])
-    ax.set_ylim([0,1])
+    ax.set_xlim([-0.1,1.1])
+    ax.set_ylim([-0.1,1.1])
 
 class mechanism_solver():
     def __init__(self):
@@ -616,6 +616,49 @@ class mechanism_solver():
         G = self.get_G(x0,C)
         return np.sum(G[np.logical_not(np.isinf(G))])    
 
+def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', show_progress=True):
+    """Fast generate a batch of random mechanisms that are not locking or invalid.
+    Parameters
+    ----------
+    N:      int
+            The number of mechanims to generate
+    g_prob: float
+            Probability of a node being assigned as ground. Default: 0.15
+    n:     int
+            Size of mechanism. Default: None (variable size)
+    N_min: int
+            Minimum size of mechanims if n is not set. Default: 8
+    N_max: int
+            Maximum size of mechanims if n is not set. Default: 20
+    strategy: str
+            Either rand or srand. 'rand': fully random, 'srand': sequentially built random. Default: 'rand'
+    show_progress: Boolean
+            If true will display progress bar. Deafault: True
+    
+    Returns
+    -------
+    list of: [N,...]
+    
+        C:     numpy array [n,n]
+                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+        x0:    numpy array [n,2]
+                    The initial positions of the 
+        fixed_nodes: numpy array [n_fixed_nodes]
+                A list of the nodes that are grounded/fixed.
+        motor: numpy array [2]
+                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+    """
+    
+    
+    args = [(g_prob, n, N_min, N_max, strategy)]*N
+    return run_imap_multiprocessing(auxilary, args, show_prog = show_progress)
+
+# Auxiary function for batch generator
+def auxilary(intermidiate):
+    np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
+    return random_generator_ns(g_prob = intermidiate[0], n=intermidiate[1], N_min=intermidiate[2], N_max=intermidiate[3], strategy=intermidiate[4])
+    
+    
 def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand'):
     """Generate random mechanism that is not locking or invalid.
     Parameters
@@ -847,7 +890,21 @@ def PolyArea(x,y):
     """
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
+
 def hyper_volume(F,ref):
+    """Get Hypervolume of population
+    Parameters
+    ----------
+    F:          numpy array [N,m]
+                    Perfromance of the paretor front/population.
+    ref:        numpy array [m]
+                    Reference point for hypervolume calculations.
+
+    Returns
+    -------
+    hypervolume:  float
+                    Hyper volume of the selected population with respect to the reference point.
+    """
     hv = get_performance_indicator("hv", ref_point=np.array(ref))
     return hv.do(F)
 
