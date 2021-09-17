@@ -909,7 +909,8 @@ def hyper_volume(F,ref):
     return hv.do(F)
 
 def evaluate_submission():
-    
+    """Evaluate CSVs in the results folder
+    """
     # Get a solver instance
     solver = mechanism_solver()
     
@@ -930,8 +931,6 @@ def evaluate_submission():
     
     for i in trange(20):
         if os.path.exists('./results/%i.csv'%i):
-            
-            
             
             mechanisms = get_population_csv('./results/%i.csv'%i)
             F = []
@@ -999,7 +998,7 @@ def to_final_represenation(C,x0,fixed_nodes,motor,target):
     node_types[fixed_nodes] = 1
 
     # Set the target
-    target_node = 4
+    target_node = target
 
     # Concatenate to make the final representaion
     final_representation = np.concatenate([[N],C.reshape(-1),x0.reshape(-1),node_types,motor,[target_node]])
@@ -1073,3 +1072,83 @@ def get_population_csv(file_name):
         for row in csv_reader:
             population.append(np.array(row).astype(np.float32))
     return population
+
+def is_pareto_efficient(costs, return_mask = True):
+    """
+    Find the pareto-efficient points
+    :param costs: An (n_points, n_costs) array
+    :param return_mask: True to return a mask
+    :return: An array of indices of pareto-efficient points.
+        If return_mask is True, this will be an (n_points, ) boolean array
+        Otherwise it will be a (n_efficient_points, ) integer array of indices.
+    """
+    is_efficient = np.arange(costs.shape[0])
+    n_points = costs.shape[0]
+    next_point_index = 0  # Next index in the is_efficient array to search for
+    while next_point_index<len(costs):
+        nondominated_point_mask = np.any(costs<costs[next_point_index], axis=1)
+        nondominated_point_mask[next_point_index] = True
+        is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+        costs = costs[nondominated_point_mask]
+        next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
+    if return_mask:
+        is_efficient_mask = np.zeros(n_points, dtype = bool)
+        is_efficient_mask[is_efficient] = True
+        return is_efficient_mask
+    else:
+        return is_efficient
+    
+    
+def visualize_pareto_front(mechanisms,F,target_curve):
+     """Draw Pareto Front in population and visualize mechanisms
+    Parameters
+    ----------
+    mechanisms: numpy array [N,...]
+                    List of 1D representations of the mechanims in the population.
+    F:          numpy array [N,n_objectives]
+                    Perfromance of the paretor population ([[chamfer distance, material]*N]).
+    target_curve:  numpy array [n,2]
+                    point cloud of target.
+
+    """
+    ind = is_pareto_efficient(F)
+    X_p = mechanisms[ind]
+    F_p = F[ind]
+    
+    ind = np.argsort(F_p[:,0])
+    
+    X_p = X_p[ind]
+    F_p = F_p[ind]
+    
+    fig, axs = plt.subplots(X_p.shape[0], 3,figsize=(15,5*X_p.shape[0]))
+    
+    # Get a solver instance
+    solver = mechanism_solver()
+    # Get a solver normalizer
+    normalizer = curve_normalizer(scale=False)
+    
+    for i in trange(X_p.shape[0]):
+        C,x0,fixed_nodes,motor,target = from_1D_representation(X_p[i])
+        draw_mechanism_on_ax(C,x0,fixed_nodes,motor,axs[i,0])
+
+        # Solve
+        x_sol, locking,over_under_defined = solver.solve_rev(200,x0,C,motor,fixed_nodes,False)
+
+        # Normalize
+        x_norm = normalizer.get_oriented(x_sol[:,target,:])
+
+        # Step 4: Rasterize
+        out_pc = rasterized_curve_coords(x_norm,500)
+
+        # Plot
+        axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
+        axs[i,1].scatter(out_pc[:,0],out_pc[:,1],s=2)
+        axs[i,1].axis('equal')
+
+        axs[i,1].set_title('Chamfer Distance: %f'%(chamfer_distance(out_pc,target_curve)))
+        
+        axs[i,2].scatter(F_p[:,1],F_p[:,0])
+        axs[i,2].set_xlabel('Material Use')
+        axs[i,2].set_ylabel('Chamfer Distance')
+        axs[i,2].scatter([F_p[i,1]],[F_p[i,0]],color="red")
+        
