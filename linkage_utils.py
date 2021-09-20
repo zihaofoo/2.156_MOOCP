@@ -1050,7 +1050,7 @@ def save_population_csv(file_name, population):
     """
     
     with open(file_name, 'w') as csvfile:
-        writer = csv.writer(csvfile, delimiter=',')
+        writer = csv.writer(csvfile, delimiter=',', lineterminator = '\n')
         for m in population:
             m = np.array(m)
             writer.writerow(m.tolist())
