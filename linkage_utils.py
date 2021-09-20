@@ -968,7 +968,7 @@ def evaluate_submission():
     
     return np.mean(scores)
 
-def to_final_represenation(C,x0,fixed_nodes,motor,target):
+def to_final_representation(C,x0,fixed_nodes,motor,target):
     """Get 1D representation of mechanism
     ----------
     C:     numpy array [N,N]
@@ -1000,7 +1000,7 @@ def to_final_represenation(C,x0,fixed_nodes,motor,target):
     # Set the target
     target_node = target
 
-    # Concatenate to make the final representaion
+    # Concatenate to make the final representation
     final_representation = np.concatenate([[N],C.reshape(-1),x0.reshape(-1),node_types,motor,[target_node]])
     
     return final_representation
@@ -1046,7 +1046,7 @@ def save_population_csv(file_name, population):
     file_name: str
                 File name and path to save the population in.
     population: list [N]
-                A list of 1D mechanims represenations to be saved in the CSV.
+                A list of 1D mechanims representations to be saved in the CSV.
     """
     
     with open(file_name, 'w') as csvfile:
@@ -1064,7 +1064,7 @@ def get_population_csv(file_name):
     Returns
     -------            
     population: list [N]
-                A list of 1D mechanims represenations from the saved CSV.
+                A list of 1D mechanims representations from the saved CSV.
     """
     population = []
     with open(file_name,'r') as csv_file:
