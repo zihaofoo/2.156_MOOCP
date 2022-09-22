@@ -4,7 +4,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 import pymoo
-from pymoo.util.display import Display
+from pymoo.util.display.display import Display
 from tqdm.autonotebook import trange
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -12,7 +12,7 @@ import multiprocessing as mp
 from tqdm import tqdm
 from sklearn.neighbors import NearestNeighbors
 import csv
-from pymoo.factory import get_performance_indicator
+from pymoo.indicators.hv import HV
 import os
 import pickle
 
@@ -178,7 +178,7 @@ def draw_mechanism(C,x0,fixed_nodes,motor):
         else:
             plt.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
         
-        for j in range(i+1,N):
+        for j in range(0,i):
             if C[i,j]:
                 plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
     solver = mechanism_solver()
@@ -526,6 +526,14 @@ class mechanism_solver():
         C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
         G = self.get_G(x0,C)
         
+        for j in fixed_nodes:
+            if j!=motor[1]:
+                if C[j, motor[0]]==1 or C[motor[0], j]==1:
+                    return np.zeros([n_steps,C.shape[0],2]), True, False
+        if motor[0] in fixed_nodes:
+            return np.zeros([n_steps,C.shape[0],2]), True, False
+
+        
         pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
 
         if not pop[0]:
@@ -691,7 +699,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     edges = [[0,1],[1,3],[2,3]]
     
     fixed_nodes = [0,2]
-    motor = [0,1]
+    motor = [1,0]
     
     node_types = np.random.binomial(1,g_prob,n-4)
     
@@ -905,8 +913,9 @@ def hyper_volume(F,ref):
     hypervolume:  float
                     Hyper volume of the selected population with respect to the reference point.
     """
-    hv = get_performance_indicator("hv", ref_point=np.array(ref))
-    return hv.do(F)
+    ind = HV(ref_point=np.array(ref))
+    return ind(F)
+
 
 def evaluate_submission():
     """Evaluate CSVs in the results folder
