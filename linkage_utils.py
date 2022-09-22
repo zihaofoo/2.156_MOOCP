@@ -1,4 +1,5 @@
 from __future__ import division
+from lib2to3.pgen2 import driver
 from math import sin, cos, acos, pi
 import warnings
 warnings.filterwarnings("ignore")
@@ -15,6 +16,19 @@ import csv
 from pymoo.indicators.hv import HV
 import os
 import pickle
+from io import StringIO
+import requests
+import xml.etree.ElementTree as etree
+from svgpath2mpl import parse_path
+
+def vectorized_chamfer_dist(x,y):
+    difference = (np.expand_dims(x, axis=-2) - np.expand_dims(y, axis=-3))
+    square_distances = np.einsum("...i,...i->...",difference, difference)
+    
+    minimum_square_distance_a_to_b = np.sqrt(np.min(square_distances, axis=-1))
+    minimum_square_distance_b_to_a = np.sqrt(np.min(square_distances, axis=-2))
+    
+    return np.mean(minimum_square_distance_a_to_b, axis=-1) + np.mean(minimum_square_distance_b_to_a, axis=-1)
 
 def chamfer_distance(x, y, metric='l2', direction='bi', subsample=True, n_max=250):
     """Chamfer distance between two point clouds
@@ -50,27 +64,18 @@ def chamfer_distance(x, y, metric='l2', direction='bi', subsample=True, n_max=25
             y_s = y
         else:
             y_s = y[np.round(np.linspace(0,y.shape[0]-1,n_max)).astype(np.int32)]
-        return chamfer_distance(x_s,y_s,subsample=False)
-            
-    
-    if direction=='y_to_x':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
-        min_y_to_x = x_nn.kneighbors(y)[0]
-        chamfer_dist = np.mean(min_y_to_x)
-    elif direction=='x_to_y':
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
-        min_x_to_y = y_nn.kneighbors(x)[0]
-        chamfer_dist = np.mean(min_x_to_y)
-    elif direction=='bi':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
-        min_y_to_x = x_nn.kneighbors(y)[0]
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
-        min_x_to_y = y_nn.kneighbors(x)[0]
-        chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
+        return vectorized_chamfer_dist(x_s,y_s)
     else:
-        raise ValueError("Invalid direction type. Supported types: \'y_x\', \'x_y\', \'bi\'")
-        
-    return chamfer_dist
+        if x.shape[0] >= y.shape[0]:
+            n_pad = x.shape[0]-y.shape[0]
+            y = np.pad(y,[[n_pad,0],[0,0]])
+            y[0:n_pad] = y[-1]
+        else:
+            n_pad = y.shape[0]-x.shape[0]
+            x = np.pad(x,[[n_pad,0],[0,0]])
+            x[0:n_pad] = x[-1]
+        return vectorized_chamfer_dist(x,y)
+            
 
 def line_segment(start, end):
     """Bresenham's Line Algorithm
@@ -169,7 +174,7 @@ def draw_mechanism(C,x0,fixed_nodes,motor):
     
     C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
     
-    x = x0;
+    x = x0
     fig = plt.figure(figsize=(12,12))
     N = C.shape[0]
     for i in range(N):
@@ -524,7 +529,6 @@ class mechanism_solver():
         
         
         C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
-        G = self.get_G(x0,C)
         
         for j in fixed_nodes:
             if j!=motor[1]:
@@ -533,32 +537,18 @@ class mechanism_solver():
         if motor[0] in fixed_nodes:
             return np.zeros([n_steps,C.shape[0],2]), True, False
 
-        
-        pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
 
-        if not pop[0]:
-            if pop[1] == 0:
-                return np.zeros([n_steps,C.shape[0],2]), False, True
-            elif pop[1] == -1:
-                return np.zeros([n_steps,C.shape[0],2]), True, False
-            elif pop[1] == -2:
-                return np.zeros([n_steps,C.shape[0],2]), False, True
+        pop = find_path(C,motor,fixed_nodes)
         
-        func = lambda t: self.position_from_path(pop[0],pop[1],t, x0, C, G, motor, fixed_nodes, show_msg)
+
+        if not pop[1]:
+            return np.zeros([n_steps,C.shape[0],2]), False, True
         
-        ts = np.linspace(0, 2*np.pi, n_steps)
-        
-        out = []
-        
-        for t in ts:
-            x_temp = func(t)
-            if np.array(x_temp).size == 1:
-                if x_temp:
-                    return np.zeros([n_steps,C.shape[0],2]), True, False
-                else:
-                    return np.zeros([n_steps,C.shape[0],2]), False, True
-            else:
-                out.append(x_temp)
+        out = solve_rev_vectorized(pop[0],x0,get_G(x0),motor,fixed_nodes,np.linspace(0, 2*np.pi, n_steps))[0]
+        out = np.transpose(out,axes=[1,0,2])
+
+        if np.isnan(out).sum() > 0:
+            return np.zeros([n_steps,C.shape[0],2]), True, False
         
         return np.array(out), False, False
     
@@ -820,9 +810,12 @@ class curve_normalizer():
         
         if self.scale:
             out = out/np.max(out,0)[0]
-        
+
         if np.isnan(np.sum(out)):
             out = np.zeros(out.shape)
+
+        out = out - np.min(out,0)
+        # out = out + (1-np.max(out,0))/2
                     
         return out
     
@@ -1161,3 +1154,239 @@ def visualize_pareto_front(mechanisms,F,target_curve):
         axs[i,2].set_ylabel('Chamfer Distance')
         axs[i,2].scatter([F_p[i,1]],[F_p[i,0]],color="red")
         
+
+def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
+    
+    path = []
+    
+    A,fixed_nodes,motor = np.array(A),np.array(fixed_nodes),np.array(motor)
+    
+    unkowns = np.array(list(range(A.shape[0])))
+
+    if motor[-1] in fixed_nodes:
+        driven = motor[0]
+    else:
+        driven = motor[-1]
+
+    knowns = np.concatenate([fixed_nodes,[driven]])
+    
+    unkowns = unkowns[np.logical_not(np.isin(unkowns,knowns))]
+
+    
+    counter = 0
+    while unkowns.shape[0] != 0:
+
+        if counter == unkowns.shape[0]:
+            # Non dyadic or DOF larger than 1
+            return [], False
+        n = unkowns[counter]
+        ne = np.where(A[n])[0]
+        
+        kne = knowns[np.isin(knowns,ne)]
+#         print(kne.shape[0])
+        
+        if kne.shape[0] == 2:
+            
+            path.append([n,kne[0],kne[1]])
+            counter = 0
+            knowns = np.concatenate([knowns,[n]])
+            unkowns = unkowns[unkowns!=n]
+        elif kne.shape[0] > 2:
+            #redundant or overconstraint
+            return [], False
+        else:
+            counter += 1
+    
+    return np.array(path), True
+
+def get_G(x0):
+    return (np.linalg.norm(np.tile([x0],[x0.shape[0],1,1]) - np.tile(np.expand_dims(x0,1),[1,x0.shape[0],1]),axis=-1))
+
+def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
+    
+    path,x0,G,motor,fixed_nodes = np.array(path),np.array(x0),np.array(G),np.array(motor),np.array(fixed_nodes)
+    
+    x = np.zeros([x0.shape[0],thetas.shape[0],2])
+    
+    x[fixed_nodes] = np.expand_dims(x0[fixed_nodes],1)
+
+    if motor[-1] in fixed_nodes:
+        driven = motor[0]
+        motor_joint = motor[-1]
+    else:
+        driven = motor[-1]
+        motor_joint = motor[0]
+
+    x[driven] = x[motor_joint] + G[motor[0],motor[1]] * np.concatenate([[np.cos(thetas)],[np.sin(thetas)]]).T
+    
+    state = np.zeros(thetas.shape[0])
+    flag = True
+    kk = np.zeros(thetas.shape[0]) - 1.0
+    
+    for step in path:
+        i = step[1]
+        j = step[2]
+        k = step[0]
+        
+        l_ij = np.linalg.norm(x[j]-x[i],axis=-1)
+        cosphi = (l_ij ** 2 + G[i,k]**2 - G[j,k]**2)/(2 * l_ij * G[i,k])
+
+        state += np.logical_or(cosphi<-1.0,cosphi>1.0)
+        
+        kk = state * k * (kk==-1.0) + kk
+        
+        s = np.sign((x0[i,1]-x0[k,1])*(x0[i,0]-x0[j,0]) - (x0[i,1]-x0[j,1])*(x0[i,0]-x0[k,0]))
+
+        phi = s * np.arccos(cosphi)
+
+        a = np.concatenate([[np.cos(phi)],[-np.sin(phi)]]).T
+        b = np.concatenate([[np.sin(phi)],[np.cos(phi)]]).T
+
+        R = np.swapaxes(np.concatenate([[a],[b]]),0,1)
+
+        scaled_ij = (x[j]-x[i])/np.expand_dims(l_ij,-1) * G[i,k]
+        x[k] = np.squeeze(R @ np.expand_dims(scaled_ij,-1)) + x[i]
+        
+    kk = (kk!=-1.0) + kk    
+    return x, state == 0.0, kk.astype(np.int32)
+
+def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
+    
+    fig = plt.figure(figsize=(12,12))
+
+    def fetch_path():
+        root = etree.parse(StringIO('<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 338"><defs><style>.cls-1{fill:#1a1a1a;stroke:#1a1a1a;stroke-linecap:round;stroke-miterlimit:10;stroke-width:20px;}</style></defs><path class="cls-1" d="M45.5,358.5l70.71-70.71M46,287.5H644m-507.61,71,70.72-70.71M223,358.5l70.71-70.71m20.18,70.72,70.71-70.71m13.67,70.7,70.71-70.71m20.19,70.72,70.71-70.71m15.84,70.71,70.71-70.71M345,39.62A121.38,121.38,0,1,1,223.62,161,121.38,121.38,0,0,1,345,39.62Z" transform="translate(-35.5 -29.62)"/></svg>')).getroot()
+        view_box = root.attrib.get('viewBox')
+        if view_box is not None:
+            view_box = [int(x) for x in view_box.split()]
+            xlim = (view_box[0], view_box[0] + view_box[2])
+            ylim = (view_box[1] + view_box[3], view_box[1])
+        else:
+            xlim = (0, 500)
+            ylim = (500, 0)
+        path_elem = root.findall('.//{http://www.w3.org/2000/svg}path')[0]
+        return xlim, ylim, parse_path(path_elem.attrib['d'])
+    _,_,p = fetch_path()
+    p.vertices -= p.vertices.mean(axis=0)
+    p.vertices = (np.array([[np.cos(np.pi), -np.sin(np.pi)],[np.sin(np.pi), np.cos(np.pi)]])@p.vertices.T).T
+    
+
+
+    A,x0,fixed_nodes,motor = np.array(A),np.array(x0),np.array(fixed_nodes),np.array(motor)
+    
+    x = x0
+    
+    N = A.shape[0]
+    for i in range(N):
+        if i in fixed_nodes:
+            if i == highlight:
+                plt.scatter(x[i,0],x[i,1],color=h_c,s=700,zorder=10,marker=p)
+            else:
+                plt.scatter(x[i,0],x[i,1],color="#1a1a1a",s=700,zorder=10,marker=p)
+        else:
+            if i == highlight:
+                plt.scatter(x[i,0],x[i,1],color=h_c,s=100,zorder=10,facecolors=h_c,alpha=0.7)
+            else:
+                plt.scatter(x[i,0],x[i,1],color="#1a1a1a",s=100,zorder=10,facecolors='#ffffff',alpha=0.7)
+        
+        for j in range(i+1,N):
+            if A[i,j]:
+                if (motor[0] == i and motor[1] == j) or(motor[0] == j and motor[1] == i):
+                    plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="#ffc800",linewidth=4.5)
+                else:
+                    plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="#1a1a1a",linewidth=4.5,alpha=0.6)
+                
+    if solve:
+        path = find_path(A,motor,fixed_nodes)[0]
+        G = get_G(x0)
+        x,c,k =  solve_rev_vectorized(path.astype(np.int32), x0, G, motor, fixed_nodes,thetas)
+        x = np.swapaxes(x,0,1)
+        if np.sum(c) == c.shape[0]:
+            for i in range(A.shape[0]):
+                if not i in fixed_nodes:
+                    if i == highlight:
+                        plt.plot(x[:,i,0],x[:,i,1],'-',color=h_c,linewidth=4.5,alpha=h_alfa)
+                    else:
+                        plt.plot(x[:,i,0],x[:,i,1],'--',color="#0078a7",linewidth=1.5, alpha=def_alpha)
+        else:
+            for i in range(A.shape[0]):
+                if not i in fixed_nodes:
+                    if i == highlight:
+                        plt.plot(x[:,i,0],x[:,i,1],'-',color=h_c,linewidth=4.5,alpha=h_alfa)
+                    else:
+                        plt.plot(x[:,i,0],x[:,i,1],'--',color="#0078a7",linewidth=1.5, alpha=def_alpha)
+            plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+        
+    plt.axis('equal')
+    plt.axis('off')
+
+
+def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
+    
+    # fig = plt.figure(figsize=(12,12))
+
+    def fetch_path():
+        root = etree.parse(StringIO('<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 338"><defs><style>.cls-1{fill:#1a1a1a;stroke:#1a1a1a;stroke-linecap:round;stroke-miterlimit:10;stroke-width:20px;}</style></defs><path class="cls-1" d="M45.5,358.5l70.71-70.71M46,287.5H644m-507.61,71,70.72-70.71M223,358.5l70.71-70.71m20.18,70.72,70.71-70.71m13.67,70.7,70.71-70.71m20.19,70.72,70.71-70.71m15.84,70.71,70.71-70.71M345,39.62A121.38,121.38,0,1,1,223.62,161,121.38,121.38,0,0,1,345,39.62Z" transform="translate(-35.5 -29.62)"/></svg>')).getroot()
+        view_box = root.attrib.get('viewBox')
+        if view_box is not None:
+            view_box = [int(x) for x in view_box.split()]
+            xlim = (view_box[0], view_box[0] + view_box[2])
+            ylim = (view_box[1] + view_box[3], view_box[1])
+        else:
+            xlim = (0, 500)
+            ylim = (500, 0)
+        path_elem = root.findall('.//{http://www.w3.org/2000/svg}path')[0]
+        return xlim, ylim, parse_path(path_elem.attrib['d'])
+    _,_,p = fetch_path()
+    p.vertices -= p.vertices.mean(axis=0)
+    p.vertices = (np.array([[np.cos(np.pi), -np.sin(np.pi)],[np.sin(np.pi), np.cos(np.pi)]])@p.vertices.T).T
+    
+
+
+    A,x0,fixed_nodes,motor = np.array(A),np.array(x0),np.array(fixed_nodes),np.array(motor)
+    
+    x = x0
+    
+    N = A.shape[0]
+    for i in range(N):
+        if i in fixed_nodes:
+            if i == highlight:
+                ax.scatter(x[i,0],x[i,1],color=h_c,s=700,zorder=10,marker=p)
+            else:
+                ax.scatter(x[i,0],x[i,1],color="#1a1a1a",s=700,zorder=10,marker=p)
+        else:
+            if i == highlight:
+                ax.scatter(x[i,0],x[i,1],color=h_c,s=100,zorder=10,facecolors=h_c,alpha=0.7)
+            else:
+                ax.scatter(x[i,0],x[i,1],color="#1a1a1a",s=100,zorder=10,facecolors='#ffffff',alpha=0.7)
+        
+        for j in range(i+1,N):
+            if A[i,j]:
+                if (motor[0] == i and motor[1] == j) or(motor[0] == j and motor[1] == i):
+                    ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="#ffc800",linewidth=4.5)
+                else:
+                    ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="#1a1a1a",linewidth=4.5,alpha=0.6)
+                
+    if solve:
+        path = find_path(A,motor,fixed_nodes)[0]
+        G = get_G(x0)
+        x,c,k =  solve_rev_vectorized(path.astype(np.int32), x0, G, motor, fixed_nodes,thetas)
+        x = np.swapaxes(x,0,1)
+        if np.sum(c) == c.shape[0]:
+            for i in range(A.shape[0]):
+                if not i in fixed_nodes:
+                    if i == highlight:
+                        ax.plot(x[:,i,0],x[:,i,1],'-',color=h_c,linewidth=4.5,alpha=h_alfa)
+                    else:
+                        ax.plot(x[:,i,0],x[:,i,1],'--',color="#0078a7",linewidth=1.5, alpha=def_alpha)
+        else:
+            for i in range(A.shape[0]):
+                if not i in fixed_nodes:
+                    if i == highlight:
+                        ax.plot(x[:,i,0],x[:,i,1],'-',color=h_c,linewidth=4.5,alpha=h_alfa)
+                    else:
+                        ax.plot(x[:,i,0],x[:,i,1],'--',color="#0078a7",linewidth=1.5, alpha=def_alpha)
+            ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+        
+    ax.axis('equal')
+    ax.axis('off')
