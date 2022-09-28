@@ -9,10 +9,12 @@ This challenge problem is focused on synthesizing planar linkage mechanisms such
 <ul>
 <li>Python >= 3.8</li>
 <li>numpy</li>
-<li>pymoo >= 0.5</li>
+<li>pymoo >= 0.6</li>
 <li>matplotlib</li>
 <li>scipy</li>
 <li>scikit-learn</li>
+<li>svgpath2mpl</li>
+<li>tqdm</li>
 </ul>
 
 
