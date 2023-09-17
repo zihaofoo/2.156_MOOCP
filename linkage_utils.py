@@ -956,6 +956,9 @@ def evaluate_submission():
                     if cd<=30 and material<=6.0:
                         F.append([cd,material])
             if len(F):            
+                if len(F)>1000:
+                    print("Over 1000 linkages submitted! Truncating submission to first 1000.")
+                    F=F[:1000]
                 scores.append(hyper_volume(np.array(F),[30,6.0]))
             else:
                 scores.append(0)
