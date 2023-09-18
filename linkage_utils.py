@@ -20,6 +20,9 @@ from io import StringIO
 import requests
 import xml.etree.ElementTree as etree
 from svgpath2mpl import parse_path
+from scipy.spatial.distance import pdist,squareform
+import torch
+from scipy.spatial import KDTree, distance
 
 def get_oriented(curve):
     """ Orient a curve
@@ -294,32 +297,6 @@ def sort_mech(A, x0, motor,fixed_nodes):
     else:
         return None
 
-def evaluate(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
-    target_pc = get_oriented(target_pc)
-    scale = target_pc.max()
-
-    if idx is None:
-        idx = C.shape[0]-1
-
-    xc = x0.copy()
-    res = sort_mech(C, x0, motor,fixed_nodes)
-    if res: 
-        C, x0, fixed_nodes, sorted_order = res
-        
-        inverse_order = np.argsort(sorted_order)
-    else:
-        return False, None, None, None, None, None
-
-    A = torch.Tensor(np.expand_dims(C,0)).to(device)
-    X = torch.Tensor(np.expand_dims(x0,0)).to(device)
-    node_types = np.zeros([1,C.shape[0],1])
-    node_types[0,fixed_nodes,:] = 1
-    node_types = torch.Tensor(node_types).to(device)
-    thetas = torch.Tensor(np.linspace(0,np.pi*2,timesteps+1)[0:timesteps]).to(device)
-
-    x_sol,cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
-
-    print(x_sol)
 
 def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
     """Simulate, then return functions and gradients for the mechanism
@@ -453,7 +430,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
     return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
 
 
-def evaluate(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
+def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
     trans = Transformation(target_pc)
     scale = target_pc.max()
 
