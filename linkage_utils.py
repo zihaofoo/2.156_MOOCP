@@ -426,7 +426,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
         if torch.isnan(CD):
             return 1e6
 
-        return CD.detach().cpu().numpy()
+        return CD.detach().cpu().numpy()*multiplier
 
     def mat_fn(x0_inp):
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
@@ -1197,6 +1197,14 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
         co = 0
         x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
         invalid = not solver.check(50,x,C,motor,fixed_nodes,False)
+
+        res = sort_mech(C, x, motor,fixed_nodes)
+        if res: 
+            C, x, fixed_nodes, sorted_order = res
+            
+            inverse_order = np.argsort(sorted_order)
+        else:
+            invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
             invalid = not solver.check(50,x,C,motor,fixed_nodes,False)
@@ -1204,7 +1212,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             
             if co>=1000:
                 return random_generator_ns(g_prob, n, N_min, N_max, strategy)
-    return C,x,fixed_nodes,motor
+
+    return C,x,fixed_nodes,[0,1]
 
 class curve_normalizer():
     def __init__(self, scale=True):
