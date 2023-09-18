@@ -428,25 +428,23 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
 
         return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)*multiplier
 
-    return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
+    return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve*multiplier
 
 
 def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
-    trans = Transformation(target_pc)
-    scale = target_pc.max()
+    target_pc = get_oriented(target_pc)
 
     if idx is None:
         idx = C.shape[0]-1
 
     xc = x0.copy()
     res = sort_mech(C, x0, motor,fixed_nodes)
-    print(res)
     if res: 
         C, x0, fixed_nodes, sorted_order = res
         
         inverse_order = np.argsort(sorted_order)
     else:
-        return False, None, None
+        return False, None, None, None
 
     A = torch.Tensor(np.expand_dims(C,0)).to(device)
     X = torch.Tensor(np.expand_dims(x0,0)).to(device)
@@ -455,20 +453,16 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
     node_types = torch.Tensor(node_types).to(device)
     thetas = torch.Tensor(np.linspace(0,np.pi*2,timesteps+1)[0:timesteps]).to(device)
 
-    current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0,0)),requires_grad = False).to(device)
+    current_x0 = torch.Tensor(np.expand_dims(x0,0)).to(device)
     sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
     if torch.isnan(sol).any():
-        return False, None, None
+        return False, None, None, None
     else:
         sol = sol.detach().numpy()[0,idx,:,:]
-        trans = Transformation(sol)
-        sol = apply_transformation(trans, sol)
+        sol = get_oriented(sol)
         CD = batch_chamfer_distance(torch.tensor(sol, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
         material = get_mat(torch.Tensor(x0), A[0])
-        return True, CD, material
-
-
-    return CD_fn, mat_fn, CD_grad, mat_grad, matched_curve*multiplier
+        return True, CD, material, sol
 
 def draw_mechanism(C,x0,fixed_nodes,motor):
     """Draw and simulate 2D planar mechanism and plot the traces for all nodes
@@ -1579,7 +1573,7 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
     
     A,fixed_nodes,motor = np.array(A),np.array(fixed_nodes),np.array(motor)
     
-    unkowns = np.array(list(range(A.shape[0])))
+    unknowns = np.array(list(range(A.shape[0])))
 
     if motor[-1] in fixed_nodes:
         driven = motor[0]
@@ -1588,16 +1582,14 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
 
     knowns = np.concatenate([fixed_nodes,[driven]])
     
-    unkowns = unkowns[np.logical_not(np.isin(unkowns,knowns))]
-
+    unknowns = unknowns[np.logical_not(np.isin(unknowns,knowns))]
     
     counter = 0
-    while unkowns.shape[0] != 0:
-
-        if counter == unkowns.shape[0]:
+    while unknowns.shape[0] != 0:
+        if counter == unknowns.shape[0]:
             # Non dyadic or DOF larger than 1
             return [], False
-        n = unkowns[counter]
+        n = unknowns[counter]
         ne = np.where(A[n])[0]
         
         kne = knowns[np.isin(knowns,ne)]
@@ -1608,7 +1600,7 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
             path.append([n,kne[0],kne[1]])
             counter = 0
             knowns = np.concatenate([knowns,[n]])
-            unkowns = unkowns[unkowns!=n]
+            unknowns = unknowns[unknowns!=n]
         elif kne.shape[0] > 2:
             #redundant or overconstraint
             return [], False
