@@ -60,6 +60,39 @@ def get_oriented(curve):
 
     return out
 
+def get_oriented_both(curve):
+    """ Orient a curve
+    Parameters
+    ----------
+    curve:  numpy array [n_points,2]
+            The curve to be oriented
+    Returns
+    -------
+    out:    numpy array [n_points,2]
+            The oriented curve
+    """
+
+    ds = squareform(pdist(curve))
+    pi,t = np.unravel_index(np.argmax(ds),ds.shape)
+
+    d = curve[pi] - curve[t]
+
+    if d[1] == 0:
+        theta = 0
+    else:
+        d = d * np.sign(d[1])
+        theta = -np.arctan(d[1]/d[0])
+
+    rot = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    out = np.matmul(rot,curve.T).T
+    out = out - np.min(out,0)
+
+    rot2 = np.array([[np.cos(theta+np.pi),-np.sin(theta+np.pi)],[np.sin(theta+np.pi),np.cos(theta+np.pi)]])
+    out2 = np.matmul(rot2,curve.T).T
+    out2 = out2 - np.min(out2,0)
+
+    return out, out2
+
 def get_oriented_angle(curve):
     """ Calculate the orientation of a curve
     Parameters
@@ -459,8 +492,10 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
         return False, None, None, None
     else:
         sol = sol.detach().numpy()[0,idx,:,:]
-        sol = get_oriented(sol)
-        CD = batch_chamfer_distance(torch.tensor(sol, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
+        sol1, sol2 = get_oriented_both(sol)
+        CD1 = batch_chamfer_distance(torch.tensor(sol1, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
+        CD2 = batch_chamfer_distance(torch.tensor(sol2, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
+        CD = min(CD1, CD2)
         material = get_mat(torch.Tensor(x0), A[0])
         return True, CD, material, sol
 
