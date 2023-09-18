@@ -459,8 +459,8 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
     if sol is not None:
         trans = Transformation(sol)
         sol = apply_transformation(trans, sol)
-        CD = batch_chamfer_distance(torch.tensor(sol).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
-        material = get_mat(torch.Tensor(x0), A[0])
+        CD = batch_chamfer_distance(torch.tensor(sol, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
+        material = get_G(torch.Tensor(x0), A[0])
         return True, CD, material
     else:
         return False, None, None
