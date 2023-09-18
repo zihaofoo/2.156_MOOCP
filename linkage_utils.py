@@ -361,6 +361,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
     m_tree = KDTree(matched_curve)
     m180_tree = KDTree(matched_curve_180)
 
+    multiplier = scale/tr[1]
 
     cd_tr = np.array([best_tree.query(matched_curve)[0].mean()+m_tree.query(best_match)[0].mean(),best_tree.query(matched_curve_180)[0].mean()+m180_tree.query(best_match)[0].mean()])
 
@@ -398,7 +399,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
         x0_in = torch.from_numpy(x0_in)
         material = get_mat(x0_in, A[0])
-        return material.detach().cpu().numpy()
+        return material.detach().cpu().numpy()*multiplier
 
     def CD_grad(x0_inp):
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
@@ -425,7 +426,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
         if torch.isnan(material):
             return np.zeros_like(x0_inp)
 
-        return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)
+        return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)*multiplier
 
     return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
 
@@ -439,6 +440,7 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
 
     xc = x0.copy()
     res = sort_mech(C, x0, motor,fixed_nodes)
+    print(res)
     if res: 
         C, x0, fixed_nodes, sorted_order = res
         
@@ -455,18 +457,18 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
 
     current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0,0)),requires_grad = False).to(device)
     sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
-    sol = sol.detach().numpy()[0,idx,:,:]
-    if sol is not None:
+    if torch.isnan(sol).any():
+        return False, None, None
+    else:
+        sol = sol.detach().numpy()[0,idx,:,:]
         trans = Transformation(sol)
         sol = apply_transformation(trans, sol)
         CD = batch_chamfer_distance(torch.tensor(sol, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
         material = get_mat(torch.Tensor(x0), A[0])
         return True, CD, material
-    else:
-        return False, None, None
 
 
-    return CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
+    return CD_fn, mat_fn, CD_grad, mat_grad, matched_curve*multiplier
 
 def draw_mechanism(C,x0,fixed_nodes,motor):
     """Draw and simulate 2D planar mechanism and plot the traces for all nodes
