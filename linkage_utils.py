@@ -91,7 +91,7 @@ def get_oriented_angle(curve):
     out2 = np.matmul(rot2,curve.T).T
     out2 = out2 - np.min(out2,0)
 
-    if out2[:,0.sum() > out[:,0].sum():
+    if out2[:,0].sum() > out[:,0].sum():
         return theta+np.pi
 
     return theta
