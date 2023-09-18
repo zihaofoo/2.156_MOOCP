@@ -455,9 +455,8 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
 
     current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0,0)),requires_grad = False).to(device)
     sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
-    print(sol.detach().numpy()[0,idx,:,:].shape)
     sol = sol.detach().numpy()[0,idx,:,:]
-    if sol:
+    if sol is not None:
         trans = Transformation(sol)
         sol = apply_transformation(trans, sol)
         CD = batch_chamfer_distance(torch.tensor(sol).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
@@ -1616,8 +1615,8 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
     
     return np.array(path), True
 
-def get_G(x0):
-    return (np.linalg.norm(np.tile([x0],[x0.shape[0],1,1]) - np.tile(np.expand_dims(x0,1),[1,x0.shape[0],1]),axis=-1))
+# def get_G(x0):
+#     return (np.linalg.norm(np.tile([x0],[x0.shape[0],1,1]) - np.tile(np.expand_dims(x0,1),[1,x0.shape[0],1]),axis=-1))
 
 def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
     
