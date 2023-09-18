@@ -235,7 +235,7 @@ def batch_chamfer_distance(c1,c2):
     chamfer_dist = d1+d2
     return chamfer_dist
 
-def get_G(x0, C):
+def get_mat(x0, C):
     """Get total link length of mechanism
     Parameters
     ----------
@@ -397,7 +397,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
     def mat_fn(x0_inp):
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
         x0_in = torch.from_numpy(x0_in)
-        material = get_G(x0_in, A[0])
+        material = get_mat(x0_in, A[0])
         return material.detach().cpu().numpy()
 
     def CD_grad(x0_inp):
@@ -420,7 +420,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
     def mat_grad(x0_inp):
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
         current_x0 = torch.nn.Parameter(torch.Tensor(x0_in),requires_grad = True).to(device)
-        material = get_G(current_x0, A[0])
+        material = get_mat(current_x0, A[0])
         material.backward()
         if torch.isnan(material):
             return np.zeros_like(x0_inp)
@@ -460,7 +460,7 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
         trans = Transformation(sol)
         sol = apply_transformation(trans, sol)
         CD = batch_chamfer_distance(torch.tensor(sol).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
-        material = get_G(torch.Tensor(x0), A[0])
+        material = get_mat(torch.Tensor(x0), A[0])
         return True, CD, material
     else:
         return False, None, None
@@ -1615,8 +1615,8 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
     
     return np.array(path), True
 
-# def get_G(x0):
-#     return (np.linalg.norm(np.tile([x0],[x0.shape[0],1,1]) - np.tile(np.expand_dims(x0,1),[1,x0.shape[0],1]),axis=-1))
+def get_G(x0):
+    return (np.linalg.norm(np.tile([x0],[x0.shape[0],1,1]) - np.tile(np.expand_dims(x0,1),[1,x0.shape[0],1]),axis=-1))
 
 def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
     
