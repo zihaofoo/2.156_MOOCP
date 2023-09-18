@@ -21,61 +21,575 @@ import requests
 import xml.etree.ElementTree as etree
 from svgpath2mpl import parse_path
 
-def vectorized_chamfer_dist(x,y):
-    difference = (np.expand_dims(x, axis=-2) - np.expand_dims(y, axis=-3))
-    square_distances = np.einsum("...i,...i->...",difference, difference)
-    
-    minimum_square_distance_a_to_b = np.sqrt(np.min(square_distances, axis=-1))
-    minimum_square_distance_b_to_a = np.sqrt(np.min(square_distances, axis=-2))
-    
-    return np.mean(minimum_square_distance_a_to_b, axis=-1) + np.mean(minimum_square_distance_b_to_a, axis=-1)
+def get_oriented(curve):
+    """ Orient a curve
+    Parameters
+    ----------
+    curve:  numpy array [n_points,2]
+            The curve to be oriented
+    Returns
+    -------
+    out:    numpy array [n_points,2]
+            The oriented curve
+    """
 
-def chamfer_distance(x, y, metric='l2', direction='bi', subsample=True, n_max=250):
+    ds = squareform(pdist(curve))
+    pi,t = np.unravel_index(np.argmax(ds),ds.shape)
+
+    d = curve[pi] - curve[t]
+
+    if d[1] == 0:
+        theta = 0
+    else:
+        d = d * np.sign(d[1])
+        theta = -np.arctan(d[1]/d[0])
+
+    rot = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    out = np.matmul(rot,curve.T).T
+    out = out - np.min(out,0)
+
+    rot2 = np.array([[np.cos(theta+np.pi),-np.sin(theta+np.pi)],[np.sin(theta+np.pi),np.cos(theta+np.pi)]])
+    out2 = np.matmul(rot2,curve.T).T
+    out2 = out2 - np.min(out2,0)
+
+    if out2[:,1].sum() > out[:,1].sum():
+        return out2
+
+    return out
+
+def get_oriented_angle(curve):
+    """ Calculated the orientation of a curve
+    Parameters
+    ----------
+    curve:  numpy array [n_points,2]
+            The curve to be oriented
+    Returns
+    -------
+    theta:  float
+            The orientation of the curve
+    """
+
+    ds = squareform(pdist(curve))
+    pi,t = np.unravel_index(np.argmax(ds),ds.shape)
+
+    d = curve[pi] - curve[t]
+
+    if d[1] == 0:
+        theta = 0
+    else:
+        d = d * np.sign(d[1])
+        theta = -np.arctan(d[1]/d[0])
+
+    rot = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    out = np.matmul(rot,curve.T).T
+    out = out - np.min(out,0)
+
+    rot2 = np.array([[np.cos(theta+np.pi),-np.sin(theta+np.pi)],[np.sin(theta+np.pi),np.cos(theta+np.pi)]])
+    out2 = np.matmul(rot2,curve.T).T
+    out2 = out2 - np.min(out2,0)
+
+    if out2[:,1].sum() > out[:,1].sum():
+        return theta+np.pi
+
+    return theta
+
+def solve_rev_vectorized_batch_wds(As,x0s,node_types,thetas):
+    """ Solve a vectorized batch of mechanisms
+    Parameters
+    ----------
+    As:     torch tensor [batch_size,N,N]
+            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+    x0s:    torch tensor [batch_size,N,2]
+            The initial positions of the nodes
+    node_types: torch tensor [batch_size,N,1]
+            A list of the nodes that are grounded/fixed.
+    thetas: torch tensor [n_thetas]
+            The angles to solve the mechanism at.
+    Returns
+    -------
+    x:     torch tensor [batch_size,N,n_thetas,2]
+            The positions of the nodes at each angle.
+
+    """
+    Gs = torch.cdist(x0s,x0s)
+
+    x = torch.zeros([x0s.shape[0],x0s.shape[1],thetas.shape[0],2]).to(As.device)
+
+    x = x + torch.unsqueeze(node_types * x0s,2)
+
+    m = x[:,0] + torch.tile(torch.unsqueeze(torch.transpose(torch.cat([torch.unsqueeze(torch.cos(thetas),0),torch.unsqueeze(torch.sin(thetas),0)],0),0,1),0),[x0s.shape[0],1,1]) * torch.unsqueeze(torch.unsqueeze(Gs[:,0,1],-1),-1)
+
+    x[:,1,:,:] = m
+
+    cos_list = []
+
+    for k in range(3,x0s.shape[1]):
+        inds = torch.argsort(As[:,k,0:k])[:,-2:].numpy()
+
+        l_ijs = torch.linalg.norm(x[np.arange(x0s.shape[0]),inds[:,0]] - x[np.arange(x0s.shape[0]),inds[:,1]], dim=-1)
+
+        gik = torch.unsqueeze(Gs[np.arange(x0s.shape[0]),inds[:,0],np.ones(shape=[x0s.shape[0]])*k],-1)
+        gjk = torch.unsqueeze(Gs[np.arange(x0s.shape[0]),inds[:,1],np.ones(shape=[x0s.shape[0]])*k],-1)
+
+        cosphis = (torch.square(l_ijs) + torch.square(gik) - torch.square(gjk))/(2 * l_ijs * gik)
+
+        cosphis = torch.where(torch.tile(node_types[:,k],[1,thetas.shape[0]])==0.0,cosphis,torch.zeros_like(cosphis))
+
+        cos_list.append(cosphis.unsqueeze(1))
+
+        x0i1 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.ones(shape=[x0s.shape[0]]).astype(np.int32)]
+        x0i0 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.zeros(shape=[x0s.shape[0]]).astype(np.int32)]
+
+        x0j1 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.ones(shape=[x0s.shape[0]]).astype(np.int32)]
+        x0j0 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.zeros(shape=[x0s.shape[0]]).astype(np.int32)]
+
+        x0k1 = x0s[:,k,1]
+        x0k0 = x0s[:,k,0]
+
+        s = torch.unsqueeze(torch.sign((x0i1-x0k1)*(x0i0-x0j0) - (x0i1-x0j1)*(x0i0-x0k0)),-1)
+
+
+        phi = s * torch.arccos(cosphis)
+
+        a = torch.permute(torch.cat([torch.unsqueeze(torch.cos(phi),0),torch.unsqueeze(-torch.sin(phi),0)],0),dims=[1,2,0])
+        b = torch.permute(torch.cat([torch.unsqueeze(torch.sin(phi),0),torch.unsqueeze(torch.cos(phi),0)],0),dims=[1,2,0])
+
+        R = torch.einsum("ijk...->jki...", torch.cat([torch.unsqueeze(a,0),torch.unsqueeze(b,0)],0))
+
+        xi = x[np.arange(x0s.shape[0]),inds[:,0]]
+        xj = x[np.arange(x0s.shape[0]),inds[:,1]]
+
+        scaled_ij = (xj-xi)/torch.unsqueeze(l_ijs,-1) * torch.unsqueeze(gik,-1)
+
+        x_k = torch.squeeze(torch.matmul(R, torch.unsqueeze(scaled_ij,-1))) + xi
+        x_k = torch.where(torch.tile(torch.unsqueeze(node_types[:,k],-1),[1,thetas.shape[0],2])==0.0,x_k,torch.zeros_like(x_k))
+        x[:,k,:,:] += x_k
+    return x, torch.cat(cos_list,dim=1)
+
+def Transformation(curve):
+    """Get transformation tuple for curve
+    Parameters
+    ----------
+    curve:  numpy array [n_points,2]
+            The curve to be transformed
+    Returns
+    -------
+    tr:     tuple
+            Transformation tuple (theta,scale,translation)
+    """
+
+    theta = -get_oriented_angle(curve)
+    or_c = get_oriented(curve)
+    scale = or_c.max()
+    # scale = total_length(np.array([or_c]))[0]
+    translation = curve.min(0)
+    # translation = curve.mean(0)
+
+    return theta,scale,translation
+
+def apply_transformation(tr,curve):
+    """ Apply transformation to curve
+    Parameters
+    ----------
+    tr:     tuple
+            Transformation tuple (theta,scale,translation)
+    curve:  numpy array [n_points,2]
+            The curve to be transformed
+    Returns
+    -------
+    out:    numpy array [n_points,2]
+            The transformed curve
+    """
+
+    theta,scale,translation = tr
+
+    rot = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    out = np.matmul(rot,curve.T).T
+    out = scale * out
+    out = out - np.min(out,0)
+    # out = out - out.mean(0)
+    out = out + translation
+
+    return out
+
+def batch_chamfer_distance(c1,c2):
     """Chamfer distance between two point clouds
     Parameters
     ----------
-    x: numpy array [n_points_x, n_dims]
+    c1: torch tensor [n_points_x, n_dims]
         first point cloud
-    y: numpy array [n_points_y, n_dims]
+    c2: torch tensor [n_points_y, n_dims]
         second point cloud
-    metric: string or callable, default ‘l2’
-        metric to use for distance computation. Any metric from scikit-learn or scipy.spatial.distance can be used.
-    direction: str
-        direction of Chamfer distance.
-            'y_to_x':  computes average minimal distance from every point in y to x
-            'x_to_y':  computes average minimal distance from every point in x to y
-            'bi': compute both
-    subsample: boolean
-        If true will use only a subsample of points in the cloud (to reduce computational cost)
-    n_max:     int
-        If subsample is enabled a sub sample of this many points will be used to calculate chamfer distance
     Returns
     -------
     chamfer_dist: float
         computed bidirectional Chamfer distance:
             sum_{x_i \in x}{\min_{y_j \in y}{||x_i-y_j||**2}} + sum_{y_j \in y}{\min_{x_i \in x}{||x_i-y_j||**2}}
     """
-    if subsample:
-        if x.shape[0]>n_max:
-            x_s = x
-        else:
-            x_s = x[np.round(np.linspace(0,x.shape[0]-1,n_max)).astype(np.int32)]
-        if y.shape[0]>n_max:
-            y_s = y
-        else:
-            y_s = y[np.round(np.linspace(0,y.shape[0]-1,n_max)).astype(np.int32)]
-        return vectorized_chamfer_dist(x_s,y_s)
+    d = torch.cdist(c1,c2)
+    d1 = d.min(dim=1)[0].mean(dim=1)
+    d2 = d.min(dim=2)[0].mean(dim=1)
+    chamfer_dist = d1+d2
+    return chamfer_dist
+
+def get_G(x0, C):
+    """Get total link length of mechanism
+    Parameters
+    ----------
+    x0:    torch tensor [N,2]
+        The initial positions of the
+    C:     torch tensor [N,N]
+              Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+
+    Returns
+    -------
+    total:     float
+              total length of all links in mechanism.
+    """
+
+    N = C.shape[0]
+    G = torch.zeros_like(C, dtype=float)
+    for i in range(N):
+        for j in range(i):
+            if C[i,j]:
+                G[i,j] = G[j,i] = torch.norm(x0[i]-x0[j])
+            else:
+                G[i,j] = G[j,i] = 0
+    total = torch.sum(G)
+    return total
+
+def sort_mech(A, x0, motor,fixed_nodes):
+    if motor[1] in fixed_nodes:
+        return None
+    nt = np.zeros([A.shape[0],1])
+    nt[fixed_nodes] = 1 
+
+
+    if motor[-1] in fixed_nodes:
+        t = motor[0]
+        motor[0] = motor[1]
+        motor[1] = t
+
+    motor_first_order = np.arange(A.shape[0])
+    motor_first_order = motor_first_order[motor_first_order!=motor[0]]
+    motor_first_order = motor_first_order[motor_first_order!=motor[1]]
+    motor_first_order = np.concatenate([motor,motor_first_order])
+
+ 
+
+    A = A[motor_first_order,:][:,motor_first_order]
+    x0 = x0[motor_first_order]
+    nt = nt[motor_first_order]
+    p,check = find_path(A,[0,1],np.where(nt)[0])
+
+ 
+
+    if check:
+        fixed_nodes = np.where(nt[1:])[0]+1
+        sorted_order = np.concatenate([[0,1],fixed_nodes,p[:,0]])
+        A = A[sorted_order,:][:,sorted_order]
+        x0 = x0[sorted_order]
+        nt = nt[sorted_order]
+        return A,x0,np.where(nt)[0], motor_first_order[sorted_order]
     else:
-        if x.shape[0] >= y.shape[0]:
-            n_pad = x.shape[0]-y.shape[0]
-            y = np.pad(y,[[n_pad,0],[0,0]])
-            y[0:n_pad] = y[-1]
+        return None
+
+def evaluate(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
+    target_pc = get_oriented(target_pc)
+    scale = target_pc.max()
+
+    if idx is None:
+        idx = C.shape[0]-1
+
+    xc = x0.copy()
+    res = sort_mech(C, x0, motor,fixed_nodes)
+    if res: 
+        C, x0, fixed_nodes, sorted_order = res
+        
+        inverse_order = np.argsort(sorted_order)
+    else:
+        return False, None, None, None, None, None
+
+    A = torch.Tensor(np.expand_dims(C,0)).to(device)
+    X = torch.Tensor(np.expand_dims(x0,0)).to(device)
+    node_types = np.zeros([1,C.shape[0],1])
+    node_types[0,fixed_nodes,:] = 1
+    node_types = torch.Tensor(node_types).to(device)
+    thetas = torch.Tensor(np.linspace(0,np.pi*2,timesteps+1)[0:timesteps]).to(device)
+
+    x_sol,cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
+
+    print(x_sol)
+
+def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
+    """Simulate, then return functions and gradients for the mechanism
+    Parameters
+    ----------
+    C:     numpy array [N,N]
+            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+    x0:    numpy array [N,2]
+            The positions of the nodes
+    fixed_nodes: numpy array [n_fixed_nodes]
+            A list of the nodes that are grounded/fixed.
+    target_pc: numpy array [n_points,2]
+            The target point cloud that the mechanism should match.
+
+    Returns
+    -------
+    validity: bool
+            bool indicating whether the mechanism is valid
+    CD_fn:     function
+            function that returns the Chamfer distance between the target point cloud and the mechanism.
+    mat_fn:     function
+            function that returns the total length of the mechanism.
+    CD_grad:     function
+            function that returns the gradient of the Chamfer distance between the target point cloud and the mechanism.
+    mat_grad:     function
+            function that returns the gradient of the total length of the mechanism.
+    matched_curve: numpy array [n_points,2]
+            The curve that the mechanism matches to the target point cloud.
+    
+    """
+    # target_pc = target_pc/500
+    target_pc = get_oriented(target_pc)
+    scale = target_pc.max()
+
+    if idx is None:
+        idx = C.shape[0]-1
+
+    xc = x0.copy()
+    res = sort_mech(C, x0, motor,fixed_nodes)
+    if res: 
+        C, x0, fixed_nodes, sorted_order = res
+        
+        inverse_order = np.argsort(sorted_order)
+    else:
+        return False, None, None, None, None, None
+
+    A = torch.Tensor(np.expand_dims(C,0)).to(device)
+    X = torch.Tensor(np.expand_dims(x0,0)).to(device)
+    node_types = np.zeros([1,C.shape[0],1])
+    node_types[0,fixed_nodes,:] = 1
+    node_types = torch.Tensor(node_types).to(device)
+    thetas = torch.Tensor(np.linspace(0,np.pi*2,timesteps+1)[0:timesteps]).to(device)
+
+    x_sol,cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
+    best_match = x_sol[0,idx].detach().cpu().numpy()
+    best_tree = KDTree(best_match)
+
+    tr = Transformation(best_match)
+    matched_curve = apply_transformation(tr,target_pc/scale)
+    matched_curve_180 = apply_transformation((tr[0]+np.pi,tr[1],tr[2]),target_pc/scale)
+
+    m_tree = KDTree(matched_curve)
+    m180_tree = KDTree(matched_curve_180)
+
+
+    cd_tr = np.array([best_tree.query(matched_curve)[0].mean()+m_tree.query(best_match)[0].mean(),best_tree.query(matched_curve_180)[0].mean()+m180_tree.query(best_match)[0].mean()])
+
+    if cd_tr[1]<cd_tr[0]:
+        tr = (tr[0]+np.pi,tr[1],tr[2])
+        matched_curve = matched_curve_180
+
+    target = torch.Tensor(matched_curve.astype(np.float32)).to(device).unsqueeze(0)
+
+    def CD_fn(x0_inp):
+        x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
+
+        current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0_in,0)),requires_grad = True).to(device)
+        with torch.no_grad():
+
+
+            sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
+
+            ds = torch.square(torch.log(torch.pow(1 - torch.square(cos[0]),0.25))).mean()
+
+            current_sol = sol[0,idx]
+            CD = batch_chamfer_distance(current_sol.unsqueeze(0)/tr[1],target/tr[1])[0]
+
+        # if torch.isnan(current_sol).sum()>0 or CD<=thCD:
+        #     break
+
+        # final_loss = CD + pen*ds
+
+        if torch.isnan(CD):
+            return 1e6
+
+        return CD.detach().cpu().numpy()
+
+    def mat_fn(x0_inp):
+        x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
+        x0_in = torch.from_numpy(x0_in)
+        material = get_G(x0_in, A[0])
+        return material.detach().cpu().numpy()
+
+    def CD_grad(x0_inp):
+        x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
+        current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0_in,0)),requires_grad = True).to(device)
+
+        sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
+
+        ds = torch.square(torch.log(torch.pow(1 - torch.square(cos[0]),0.25))).mean()
+
+        current_sol = sol[0,idx]
+        CD = batch_chamfer_distance(current_sol.unsqueeze(0)/tr[1],target/tr[1])[0]
+
+        CD.backward()
+
+        if torch.isnan(CD):
+            return np.zeros_like(x0_inp)
+        return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)
+
+    def mat_grad(x0_inp):
+        x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]
+        current_x0 = torch.nn.Parameter(torch.Tensor(x0_in),requires_grad = True).to(device)
+        material = get_G(current_x0, A[0])
+        material.backward()
+        if torch.isnan(material):
+            return np.zeros_like(x0_inp)
+
+        return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)
+
+    return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
+
+
+def evaluate(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
+    trans = Transformation(target_pc)
+    scale = target_pc.max()
+
+    if idx is None:
+        idx = C.shape[0]-1
+
+    xc = x0.copy()
+    res = sort_mech(C, x0, motor,fixed_nodes)
+    if res: 
+        C, x0, fixed_nodes, sorted_order = res
+        
+        inverse_order = np.argsort(sorted_order)
+    else:
+        return False, None, None
+
+    A = torch.Tensor(np.expand_dims(C,0)).to(device)
+    X = torch.Tensor(np.expand_dims(x0,0)).to(device)
+    node_types = np.zeros([1,C.shape[0],1])
+    node_types[0,fixed_nodes,:] = 1
+    node_types = torch.Tensor(node_types).to(device)
+    thetas = torch.Tensor(np.linspace(0,np.pi*2,timesteps+1)[0:timesteps]).to(device)
+
+    current_x0 = torch.nn.Parameter(torch.Tensor(np.expand_dims(x0,0)),requires_grad = False).to(device)
+    sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
+    print(sol.detach().numpy()[0,idx,:,:].shape)
+    sol = sol.detach().numpy()[0,idx,:,:]
+    if sol:
+        trans = Transformation(sol)
+        sol = apply_transformation(trans, sol)
+        CD = batch_chamfer_distance(torch.tensor(sol).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
+        material = get_G(torch.Tensor(x0), A[0])
+        return True, CD, material
+    else:
+        return False, None, None
+
+
+    return CD_fn, mat_fn, CD_grad, mat_grad, matched_curve
+
+def draw_mechanism(C,x0,fixed_nodes,motor):
+    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
+    Parameters
+    ----------
+    C:     numpy array [N,N]
+            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+    x0:    numpy array [N,2]
+            The initial positions of the 
+    fixed_nodes: numpy array [n_fixed_nodes]
+            A list of the nodes that are grounded/fixed.
+    motor: numpy array [2]
+            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+    """
+    
+    C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+    
+    x = x0
+    fig = plt.figure(figsize=(12,12))
+    N = C.shape[0]
+    for i in range(N):
+        if i in fixed_nodes:
+            plt.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
         else:
-            n_pad = y.shape[0]-x.shape[0]
-            x = np.pad(x,[[n_pad,0],[0,0]])
-            x[0:n_pad] = x[-1]
-        return vectorized_chamfer_dist(x,y)
-            
+            plt.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
+        
+        for j in range(0,i):
+            if C[i,j]:
+                plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
+    solver = mechanism_solver()
+    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
+    if not f1 and not f2:
+        for i in range(C.shape[0]):
+            if not i in fixed_nodes:
+                plt.plot(xo[:,i,0],xo[:,i,1])
+    else:
+        plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+        
+    plt.axis('equal')
+    plt.xlim([-0.1,1.1])
+    plt.ylim([-0.1,1.1])
+    
+def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
+    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
+    Parameters
+    ----------
+    C:     numpy array [N,N]
+            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+    x0:    numpy array [N,2]
+            The initial positions of the 
+    fixed_nodes: numpy array [n_fixed_nodes]
+            A list of the nodes that are grounded/fixed.
+    motor: numpy array [2]
+            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+    ax:    matplotlib axis object
+            in case part of a subplot use this and pass the axis object.
+    """
+    N = C.shape[0]
+    for i in range(N):
+        if i in fixed_nodes:
+            ax.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
+        else:
+            ax.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
+        
+        for j in range(i+1,N):
+            if C[i,j]:
+                ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
+    solver = mechanism_solver()
+    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
+    if not f1 and not f2:
+        for i in range(C.shape[0]):
+            if not i in fixed_nodes:
+                ax.plot(xo[:,i,0],xo[:,i,1])
+    else:
+        ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+        
+    ax.axis('equal')
+    ax.set_xlim([-0.1,1.1])
+    ax.set_ylim([-0.1,1.1])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def line_segment(start, end):
     """Bresenham's Line Algorithm
@@ -158,461 +672,384 @@ def rasterized_curve_coords(curve, res):
     
     return out
 
-def draw_mechanism(C,x0,fixed_nodes,motor):
-    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
-    Parameters
-    ----------
-    C:     numpy array [N,N]
-            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-    x0:    numpy array [N,2]
-            The initial positions of the 
-    fixed_nodes: numpy array [n_fixed_nodes]
-            A list of the nodes that are grounded/fixed.
-    motor: numpy array [2]
-            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-    """
-    
-    C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
-    
-    x = x0
-    fig = plt.figure(figsize=(12,12))
-    N = C.shape[0]
-    for i in range(N):
-        if i in fixed_nodes:
-            plt.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
-        else:
-            plt.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
-        
-        for j in range(0,i):
-            if C[i,j]:
-                plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
-    solver = mechanism_solver()
-    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
-    if not f1 and not f2:
-        for i in range(C.shape[0]):
-            if not i in fixed_nodes:
-                plt.plot(xo[:,i,0],xo[:,i,1])
-    else:
-        plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
-        
-    plt.axis('equal')
-    plt.xlim([-0.1,1.1])
-    plt.ylim([-0.1,1.1])
-    
-def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
-    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
-    Parameters
-    ----------
-    C:     numpy array [N,N]
-            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-    x0:    numpy array [N,2]
-            The initial positions of the 
-    fixed_nodes: numpy array [n_fixed_nodes]
-            A list of the nodes that are grounded/fixed.
-    motor: numpy array [2]
-            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-    ax:    matplotlib axis object
-            in case part of a subplot use this and pass the axis object.
-    """
-    N = C.shape[0]
-    for i in range(N):
-        if i in fixed_nodes:
-            ax.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
-        else:
-            ax.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
-        
-        for j in range(i+1,N):
-            if C[i,j]:
-                ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
-    solver = mechanism_solver()
-    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
-    if not f1 and not f2:
-        for i in range(C.shape[0]):
-            if not i in fixed_nodes:
-                ax.plot(xo[:,i,0],xo[:,i,1])
-    else:
-        ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
-        
-    ax.axis('equal')
-    ax.set_xlim([-0.1,1.1])
-    ax.set_ylim([-0.1,1.1])
 
-class mechanism_solver():
-    def __init__(self):
-        """Instance of a solver which outputs the path taken by nodes of a mechanims
-        """
-        pass
+
+# class mechanism_solver():
+#     def __init__(self):
+#         """Instance of a solver which outputs the path taken by nodes of a mechanims
+#         """
+#         pass
     
-    def find_neighbors(self, index, C):
-        """Find neighbors of a node (i.e., nodes that are connected to the node of interest)
-        Parameters
-        ----------
-        index: int
-                Index of the node neighbours are needed for.
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        Returns
-        -------
-        neigbours: numpy array [n_neighbours].
-                 List of the neigbours for the input node.
-        """
-        return np.where(C[index])[0]
+#     def find_neighbors(self, index, C):
+#         """Find neighbors of a node (i.e., nodes that are connected to the node of interest)
+#         Parameters
+#         ----------
+#         index: int
+#                 Index of the node neighbours are needed for.
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         Returns
+#         -------
+#         neigbours: numpy array [n_neighbours].
+#                  List of the neigbours for the input node.
+#         """
+#         return np.where(C[index])[0]
     
-    def find_unvisited_neighbors(self, index, C, visited_list):
-        """Find neighbors of a node that are not visited (i.e., neighbours that are not solved yet)
-        Parameters
-        ----------
-        index: int
-                Index of the node neighbours are needed for.
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        visited_list: numpy array [N]
-                 A list of booleans indicated wether the node with the index of the element in this array has been visited.
-        Returns
-        -------
-        visted neigbours: numpy array [n_neighbours].
-                 List of the visited neigbours for the input node.
-        """
-        return np.where(np.logical_and(C[index],np.logical_not(visited_list)))[0]
+#     def find_unvisited_neighbors(self, index, C, visited_list):
+#         """Find neighbors of a node that are not visited (i.e., neighbours that are not solved yet)
+#         Parameters
+#         ----------
+#         index: int
+#                 Index of the node neighbours are needed for.
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         visited_list: numpy array [N]
+#                  A list of booleans indicated wether the node with the index of the element in this array has been visited.
+#         Returns
+#         -------
+#         visted neigbours: numpy array [n_neighbours].
+#                  List of the visited neigbours for the input node.
+#         """
+#         return np.where(np.logical_and(C[index],np.logical_not(visited_list)))[0]
     
-    def get_G(self, x0, C):
-        """Get distance matrix for a mechanism
-        Parameters
-        ----------
-        x0:    numpy array [N,2]
-            The initial positions of the 
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#     def get_G(self, x0, C):
+#         """Get distance matrix for a mechanism
+#         Parameters
+#         ----------
+#         x0:    numpy array [N,2]
+#             The initial positions of the 
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
         
-        Returns
-        -------
-        G:     numpy array [N,N].
-                 distance between nodes that are connected and infinity if nodes are not connected constructed similar to C.
-        """
-        N = C.shape[0]
-        G = np.zeros_like(C, dtype=float)
-        for i in range(N):
-            for j in range(i):
-                if C[i,j]:
-                    G[i,j] = G[j,i] = np.linalg.norm(x0[i]-x0[j])
-                else:
-                    G[i,j] = G[j,i] = np.inf
+#         Returns
+#         -------
+#         G:     numpy array [N,N].
+#                  distance between nodes that are connected and infinity if nodes are not connected constructed similar to C.
+#         """
+#         N = C.shape[0]
+#         G = np.zeros_like(C, dtype=float)
+#         for i in range(N):
+#             for j in range(i):
+#                 if C[i,j]:
+#                     G[i,j] = G[j,i] = np.linalg.norm(x0[i]-x0[j])
+#                 else:
+#                     G[i,j] = G[j,i] = np.inf
                     
-        return G
+#         return G
     
-    def get_path(self, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get Path to solution
-        Parameters
-        ----------
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        Path:  numpy array [n_steps].
-                Order of solving nodes.
-        op:
-               numpy array [n_steps,2]
-                Nodes used to solve for specific step.
-        """
+#     def get_path(self, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get Path to solution
+#         Parameters
+#         ----------
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         Path:  numpy array [n_steps].
+#                 Order of solving nodes.
+#         op:
+#                numpy array [n_steps,2]
+#                 Nodes used to solve for specific step.
+#         """
         
-        C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
-        theta = 0.0
+#         C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
+#         theta = 0.0
         
-        path = []
-        op = []
+#         path = []
+#         op = []
         
-        N = C.shape[0]
-        x = np.zeros((N, 2))
-        visited_list = np.zeros(N, dtype=bool)
-        active_list = []
+#         N = C.shape[0]
+#         x = np.zeros((N, 2))
+#         visited_list = np.zeros(N, dtype=bool)
+#         active_list = []
         
-        visited_list[fixed_nodes] = True
+#         visited_list[fixed_nodes] = True
         
         
-        if motor[1] in fixed_nodes.tolist():
-            t = motor[0]
-            motor[0] = motor[1]
-            motor[1] = t
-        elif not motor[0] in fixed_nodes.tolist():
-            if show_msg:
-                print('Incorrect motor linkage.')
-            return None, -2
+#         if motor[1] in fixed_nodes.tolist():
+#             t = motor[0]
+#             motor[0] = motor[1]
+#             motor[1] = t
+#         elif not motor[0] in fixed_nodes.tolist():
+#             if show_msg:
+#                 print('Incorrect motor linkage.')
+#             return None, -2
         
-        visited_list[motor[1]] = True
+#         visited_list[motor[1]] = True
         
-        x[fixed_nodes] = x0[fixed_nodes]
+#         x[fixed_nodes] = x0[fixed_nodes]
         
-        dx = x0[motor[1],0] - x0[motor[0],0]
-        dy = x0[motor[1],1] - x0[motor[0],1]
+#         dx = x0[motor[1],0] - x0[motor[0],0]
+#         dy = x0[motor[1],1] - x0[motor[0],1]
         
-        theta_0 = np.math.atan2(dy,dx)
-        theta = theta_0 + theta
+#         theta_0 = np.math.atan2(dy,dx)
+#         theta = theta_0 + theta
         
-        x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
-        x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
+#         x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
+#         x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
         
-        neighbors = self.find_neighbors(motor[1], C)
-        vn = neighbors[visited_list[neighbors]]
-        if vn.shape[0]>2:
-            if show_msg:
-                print('Redudndant or overdefined system.')
-            return None, -2
+#         neighbors = self.find_neighbors(motor[1], C)
+#         vn = neighbors[visited_list[neighbors]]
+#         if vn.shape[0]>2:
+#             if show_msg:
+#                 print('Redudndant or overdefined system.')
+#             return None, -2
         
-        hanging_nodes = np.where(C.sum(0)==0)[0]
-        for hn in hanging_nodes:
-            if not hn in fixed_nodes.tolist():
-                if show_msg:
-                    print('DOF larger than 1.')
-                return None, 0
+#         hanging_nodes = np.where(C.sum(0)==0)[0]
+#         for hn in hanging_nodes:
+#             if not hn in fixed_nodes.tolist():
+#                 if show_msg:
+#                     print('DOF larger than 1.')
+#                 return None, 0
         
-        for i in np.where(visited_list)[0]:            
-            active_list += list(self.find_unvisited_neighbors(i, C, visited_list))
+#         for i in np.where(visited_list)[0]:            
+#             active_list += list(self.find_unvisited_neighbors(i, C, visited_list))
             
-        active_list = list(set(active_list))
+#         active_list = list(set(active_list))
         
-        counter = 0
+#         counter = 0
         
-        while len(active_list)>0:
-            k = active_list.pop(0)
-            neighbors = self.find_neighbors(k, C)
-            vn = neighbors[visited_list[neighbors]]
-            if vn.shape[0]>1:
-                if vn.shape[0]>2:
-                    if show_msg:
-                        print('Redudndant or overdefined system.')
-                    return None, -2
-                i = vn[0]
-                j = vn[1]
-                l_ij = np.linalg.norm(x[j]-x[i])
-                s = np.sign((x0[i,1]-x0[k,1])*(x0[i,0]-x0[j,0]) - (x0[i,1]-x0[j,1])*(x0[i,0]-x0[k,0]))
-                cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
-                if cosphi >= -1.0 and cosphi <= 1.0:
-                    phi = s * acos(cosphi)
-                    R = np.array([[cos(phi), -sin(phi)],
-                                  [sin(phi), cos(phi)]])
-                    scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
-                    x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
-                    path.append(k)
-                    op.append([i,j,s])
-                else:
-                    if show_msg:
-                        print('Locking or degenerate linkage!')
-                    return None, -1
+#         while len(active_list)>0:
+#             k = active_list.pop(0)
+#             neighbors = self.find_neighbors(k, C)
+#             vn = neighbors[visited_list[neighbors]]
+#             if vn.shape[0]>1:
+#                 if vn.shape[0]>2:
+#                     if show_msg:
+#                         print('Redudndant or overdefined system.')
+#                     return None, -2
+#                 i = vn[0]
+#                 j = vn[1]
+#                 l_ij = np.linalg.norm(x[j]-x[i])
+#                 s = np.sign((x0[i,1]-x0[k,1])*(x0[i,0]-x0[j,0]) - (x0[i,1]-x0[j,1])*(x0[i,0]-x0[k,0]))
+#                 cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
+#                 if cosphi >= -1.0 and cosphi <= 1.0:
+#                     phi = s * acos(cosphi)
+#                     R = np.array([[cos(phi), -sin(phi)],
+#                                   [sin(phi), cos(phi)]])
+#                     scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
+#                     x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
+#                     path.append(k)
+#                     op.append([i,j,s])
+#                 else:
+#                     if show_msg:
+#                         print('Locking or degenerate linkage!')
+#                     return None, -1
                 
-                visited_list[k] = True
-                active_list += list(self.find_unvisited_neighbors(k, C, visited_list))
-                active_list = list(set(active_list))
-                counter = 0
-            else:
-                counter += 1
-                active_list.append(k)
+#                 visited_list[k] = True
+#                 active_list += list(self.find_unvisited_neighbors(k, C, visited_list))
+#                 active_list = list(set(active_list))
+#                 counter = 0
+#             else:
+#                 counter += 1
+#                 active_list.append(k)
             
-            if counter > len(active_list):
-                if show_msg:
-                    print('DOF larger than 1.')
-                return None, 0
-        return path, op
+#             if counter > len(active_list):
+#                 if show_msg:
+#                     print('DOF larger than 1.')
+#                 return None, 0
+#         return path, op
     
-    def position_from_path(self, path, op, theta, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get position at specific angle to solution
-        Parameters
-        ----------
-        Path:  numpy array [n_steps].
-                Order of solving nodes.
-        op:
-               numpy array [n_steps,2]
-                Nodes used to solve for specific step.
-        theta: float
-                Deviation from initial position angle at the motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     numpy array [N,2].
-                Positions of nodes at given angle.
-        """
+#     def position_from_path(self, path, op, theta, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get position at specific angle to solution
+#         Parameters
+#         ----------
+#         Path:  numpy array [n_steps].
+#                 Order of solving nodes.
+#         op:
+#                numpy array [n_steps,2]
+#                 Nodes used to solve for specific step.
+#         theta: float
+#                 Deviation from initial position angle at the motor.
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         x:     numpy array [N,2].
+#                 Positions of nodes at given angle.
+#         """
         
-        C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
-        N = C.shape[0]
-        x = np.zeros((N, 2))
-        visited_list = np.zeros(N, dtype=bool)
-        active_list = []
+#         C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
+#         N = C.shape[0]
+#         x = np.zeros((N, 2))
+#         visited_list = np.zeros(N, dtype=bool)
+#         active_list = []
         
-        visited_list[fixed_nodes] = True
-        
-        
-        if motor[1] in fixed_nodes.tolist():
-            t = motor[0]
-            motor[0] = motor[1]
-            motor[1] = t
-        elif not motor[0] in fixed_nodes.tolist():
-            if show_msg:
-                print('Incorrect motor linkage.')
-            return None, -2
-        
-        visited_list[motor[1]] = True
-        
-        x[fixed_nodes] = x0[fixed_nodes]
-        
-        dx = x0[motor[1],0] - x0[motor[0],0]
-        dy = x0[motor[1],1] - x0[motor[0],1]
-        
-        theta_0 = np.math.atan2(dy,dx)
-        theta = theta_0 + theta
-        
-        x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
-        x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
+#         visited_list[fixed_nodes] = True
         
         
-        for l,step in enumerate(path):
-            i = op[l][0]
-            j = op[l][1]
-            k = step
+#         if motor[1] in fixed_nodes.tolist():
+#             t = motor[0]
+#             motor[0] = motor[1]
+#             motor[1] = t
+#         elif not motor[0] in fixed_nodes.tolist():
+#             if show_msg:
+#                 print('Incorrect motor linkage.')
+#             return None, -2
+        
+#         visited_list[motor[1]] = True
+        
+#         x[fixed_nodes] = x0[fixed_nodes]
+        
+#         dx = x0[motor[1],0] - x0[motor[0],0]
+#         dy = x0[motor[1],1] - x0[motor[0],1]
+        
+#         theta_0 = np.math.atan2(dy,dx)
+#         theta = theta_0 + theta
+        
+#         x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
+#         x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
+        
+        
+#         for l,step in enumerate(path):
+#             i = op[l][0]
+#             j = op[l][1]
+#             k = step
             
-            l_ij = np.linalg.norm(x[j]-x[i])
-            cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
-            if cosphi >= -1.0 and cosphi <= 1.0:
-                phi = op[l][2] * acos(cosphi)
-                R = np.array([[cos(phi), -sin(phi)],
-                              [sin(phi), cos(phi)]])
-                scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
-                x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
-            else:
-                if show_msg:
-                    print('Locking or degenerate linkage!')
-                return np.abs(cosphi)
-        return x
+#             l_ij = np.linalg.norm(x[j]-x[i])
+#             cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
+#             if cosphi >= -1.0 and cosphi <= 1.0:
+#                 phi = op[l][2] * acos(cosphi)
+#                 R = np.array([[cos(phi), -sin(phi)],
+#                               [sin(phi), cos(phi)]])
+#                 scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
+#                 x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
+#             else:
+#                 if show_msg:
+#                     print('Locking or degenerate linkage!')
+#                 return np.abs(cosphi)
+#         return x
     
-    def solve_rev(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get path traced by mechanism nodes for one revolution of the motor for a number of descrete steps.
-        Parameters
-        ----------
-        n_steps:    int
-                Number of descrete steps to solve the mechanism at for the entire revolution of motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     numpy array [n_steps,N,2].
-                Positions of nodes at each angle steps for the entire revolution.
-        """
+#     def solve_rev(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get path traced by mechanism nodes for one revolution of the motor for a number of descrete steps.
+#         Parameters
+#         ----------
+#         n_steps:    int
+#                 Number of descrete steps to solve the mechanism at for the entire revolution of motor.
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         x:     numpy array [n_steps,N,2].
+#                 Positions of nodes at each angle steps for the entire revolution.
+#         """
         
         
-        C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+#         C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
         
-        for j in fixed_nodes:
-            if j!=motor[1]:
-                if C[j, motor[0]]==1 or C[motor[0], j]==1:
-                    return np.zeros([n_steps,C.shape[0],2]), True, False
-        if motor[0] in fixed_nodes:
-            return np.zeros([n_steps,C.shape[0],2]), True, False
+#         for j in fixed_nodes:
+#             if j!=motor[1]:
+#                 if C[j, motor[0]]==1 or C[motor[0], j]==1:
+#                     return np.zeros([n_steps,C.shape[0],2]), True, False
+#         if motor[0] in fixed_nodes:
+#             return np.zeros([n_steps,C.shape[0],2]), True, False
 
 
-        pop = find_path(C,motor,fixed_nodes)
+#         pop = find_path(C,motor,fixed_nodes)
         
 
-        if not pop[1]:
-            return np.zeros([n_steps,C.shape[0],2]), False, True
+#         if not pop[1]:
+#             return np.zeros([n_steps,C.shape[0],2]), False, True
         
-        out = solve_rev_vectorized(pop[0],x0,get_G(x0),motor,fixed_nodes,np.linspace(0, 2*np.pi, n_steps))[0]
-        out = np.transpose(out,axes=[1,0,2])
+#         out = solve_rev_vectorized(pop[0],x0,get_G(x0),motor,fixed_nodes,np.linspace(0, 2*np.pi, n_steps))[0]
+#         out = np.transpose(out,axes=[1,0,2])
 
-        if np.isnan(out).sum() > 0:
-            return np.zeros([n_steps,C.shape[0],2]), True, False
+#         if np.isnan(out).sum() > 0:
+#             return np.zeros([n_steps,C.shape[0],2]), True, False
         
-        return np.array(out), False, False
+#         return np.array(out), False, False
     
-    def check(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
-        """check validity of mechanism (used for random generator).
-        Parameters
-        ----------
-        n_steps:    int
-                Number of descrete steps to solve the mechanism at for the entire revolution of motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     boolean.
-                whether mechanism is valid or not.
-        """
+    # def check(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
+    #     """check validity of mechanism (used for random generator).
+    #     Parameters
+    #     ----------
+    #     n_steps:    int
+    #             Number of descrete steps to solve the mechanism at for the entire revolution of motor.
+    #     x0:    numpy array [N,2]
+    #             The initial positions of the 
+    #     C:     numpy array [N,N]
+    #             Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+    #     G:     numpy array [N,N].
+    #             Distance matrix of the palanar linkage mechanism.
+    #     motor: numpy array [2]
+    #             Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+    #     fixed_nodes: numpy array [n_fixed_nodes]
+    #             A list of the nodes that are grounded/fixed.
+    #     show_msg: boolean
+    #             Will show messages if True. Default: False.
+    #     Returns
+    #     -------
+    #     x:     boolean.
+    #             whether mechanism is valid or not.
+    #     """
         
-        C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
-        G = self.get_G(x0,C)
+    #     C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+    #     G = self.get_G(x0,C)
         
-        pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
+    #     pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
 
-        if not pop[0]:
-            if pop[1] == 0:
-                return False
-            elif pop[1] == -1:
-                return False
-            elif pop[1] == -2:
-                return False
+    #     if not pop[0]:
+    #         if pop[1] == 0:
+    #             return False
+    #         elif pop[1] == -1:
+    #             return False
+    #         elif pop[1] == -2:
+    #             return False
             
-        func = lambda t: self.position_from_path(pop[0],pop[1],t, x0, C, G, motor, fixed_nodes, show_msg)
+    #     func = lambda t: self.position_from_path(pop[0],pop[1],t, x0, C, G, motor, fixed_nodes, show_msg)
         
-        ts = np.linspace(0, 2*np.pi, n_steps)
+    #     ts = np.linspace(0, 2*np.pi, n_steps)
         
-        out = []
+    #     out = []
         
-        for t in ts:
-            x_temp = func(t)
-            if np.array(x_temp).size == 1:
-                if x_temp:
-                    return False
-                else:
-                    return False
-            else:
-                out.append(x_temp)
+    #     for t in ts:
+    #         x_temp = func(t)
+    #         if np.array(x_temp).size == 1:
+    #             if x_temp:
+    #                 return False
+    #             else:
+    #                 return False
+    #         else:
+    #             out.append(x_temp)
         
-        if np.max(out)>1.0 or np.min(out)<0.0 :
-            return False
-        else:
-            return True
+    #     if np.max(out)>1.0 or np.min(out)<0.0 :
+    #         return False
+    #     else:
+    #         return True
     
-    def material(self,x0, C):
-        G = self.get_G(x0,C)
-        return np.sum(G[np.logical_not(np.isinf(G))])    
+    # def material(self,x0, C):
+    #     G = self.get_G(x0,C)
+    #     return np.sum(G[np.logical_not(np.isinf(G))])    
 
 def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', show_progress=True):
     """Fast generate a batch of random mechanisms that are not locking or invalid.
