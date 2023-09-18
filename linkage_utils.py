@@ -61,7 +61,7 @@ def get_oriented(curve):
     return out
 
 def get_oriented_angle(curve):
-    """ Calculated the orientation of a curve
+    """ Calculate the orientation of a curve
     Parameters
     ----------
     curve:  numpy array [n_points,2]
@@ -356,19 +356,18 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
 
     tr = Transformation(best_match)
     matched_curve = apply_transformation(tr,target_pc/scale)
-    matched_curve_180 = apply_transformation((tr[0]+np.pi,tr[1],tr[2]),target_pc/scale)
+    # matched_curve_180 = apply_transformation((tr[0]+np.pi,tr[1],tr[2]),target_pc/scale)
 
     m_tree = KDTree(matched_curve)
-    m180_tree = KDTree(matched_curve_180)
+    # m180_tree = KDTree(matched_curve_180)
 
     multiplier = scale/tr[1]
-    print(multiplier)
 
-    cd_tr = np.array([best_tree.query(matched_curve)[0].mean()+m_tree.query(best_match)[0].mean(),best_tree.query(matched_curve_180)[0].mean()+m180_tree.query(best_match)[0].mean()])
+    # cd_tr = np.array([best_tree.query(matched_curve)[0].mean()+m_tree.query(best_match)[0].mean(),best_tree.query(matched_curve_180)[0].mean()+m180_tree.query(best_match)[0].mean()])
 
-    if cd_tr[1]<cd_tr[0]:
-        tr = (tr[0]+np.pi,tr[1],tr[2])
-        matched_curve = matched_curve_180
+    # if cd_tr[1]<cd_tr[0]:
+    #     tr = (tr[0]+np.pi,tr[1],tr[2])
+    #     matched_curve = matched_curve_180
 
     target = torch.Tensor(matched_curve.astype(np.float32)).to(device).unsqueeze(0)
 
