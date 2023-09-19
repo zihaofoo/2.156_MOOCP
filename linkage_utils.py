@@ -495,7 +495,12 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
         sol1, sol2 = get_oriented_both(sol)
         CD1 = batch_chamfer_distance(torch.tensor(sol1, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
         CD2 = batch_chamfer_distance(torch.tensor(sol2, dtype = float).unsqueeze(0),torch.tensor(target_pc, dtype = float).unsqueeze(0))[0]
-        CD = min(CD1, CD2)
+        if CD1<CD2:
+            CD = CD1
+            sol = sol1
+        else:
+            CD = CD2
+            sol = sol2
         material = get_mat(torch.Tensor(x0), A[0])
         return True, CD, material, sol
 
