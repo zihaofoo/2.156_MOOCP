@@ -787,6 +787,10 @@ class mechanism_solver():
         
         visited_list[fixed_nodes] = True
         
+        if (C != C.T).any():
+            if show_msg:
+                print('Asymmetric Connectivity Matrix.')
+            return None, -1
         
         if motor[1] in fixed_nodes.tolist():
             t = motor[0]
@@ -802,8 +806,15 @@ class mechanism_solver():
                 if C[motor[1], item]:
                     print([motor[1], item])
                     if show_msg:
-                        print('Incorrect motor linkage.')
+                        print('Driven node linked to ground.')
                     return None, -2
+
+        if (~C.any(axis=0)).any():
+            if show_msg:
+                print('Disconnected node.')
+            return None, 0
+
+
         
         visited_list[motor[1]] = True
         
