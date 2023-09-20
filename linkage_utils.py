@@ -798,10 +798,12 @@ class mechanism_solver():
             return None, -2
 
         for item in fixed_nodes:
-            if C[motor[1], item]:
-                if show_msg:
-                    print('Incorrect motor linkage.')
-                return None, -2
+            if item != motor[0]:
+                if C[motor[1], item]:
+                    print([motor[1], item])
+                    if show_msg:
+                        print('Incorrect motor linkage.')
+                    return None, -2
         
         visited_list[motor[1]] = True
         
@@ -925,6 +927,14 @@ class mechanism_solver():
                 print('Incorrect motor linkage.')
             return None, -2
         
+        for item in fixed_nodes:
+            if item != motor[0]:
+                if C[motor[1], item]:
+                    print([motor[1], item])
+                    if show_msg:
+                        print('Incorrect motor linkage.')
+                    return None, -2
+
         visited_list[motor[1]] = True
         
         x[fixed_nodes] = x0[fixed_nodes]
