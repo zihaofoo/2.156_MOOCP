@@ -1431,20 +1431,10 @@ def evaluate_submission():
                 C,x0,fixed_nodes,motor,target = from_1D_representation(m)
 
                 # Solve
-                x_sol,f1,f2 = solver.solve_rev(200,x0,C,motor,fixed_nodes,False)
+                valid, CD, material, _ = evaluate_mechanism(C,x0,motor,fixed_nodes,device='cpu',timesteps=50)
                 
-                if not f1 and not f2:
-                    # Normalize
-                    x_norm = normalizer.get_oriented(x_sol[:,target,:])
-
-                    # Step 4: Rasterize
-                    out_pc = rasterized_curve_coords(x_norm,500)
-
-                    # Step 5: Compare
-                    cd = chamfer_distance(out_pc,target_curves[i],subsample=False)
-                    material = solver.material(x0,C)
-                    
-                    if cd<=0.2 and material<=5.0:
+                if valid:                    
+                    if CD<=0.2 and material<=5.0:
                         F.append([cd,material])
             if len(F):            
                 if len(F)>1000:
@@ -1623,7 +1613,7 @@ def visualize_pareto_front(mechanisms,F,target_curve):
         draw_mechanism_on_ax(C,x0,fixed_nodes,motor,axs[i,0])
 
         # Solve
-        valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes,motor,target_curve)
+        valid, CD, mat, sol = evaluate_mechanism(C,x0,motor,fixed_nodes,target_curve)
 
         # Plot
         axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
@@ -1743,10 +1733,10 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
-    if not valid:
-        print("Mechanism is invalid!")
-        return
+    # valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    # if not valid:
+    #     print("Mechanism is invalid!")
+    #     return
 
     fig = plt.figure(figsize=(12,12))
 
