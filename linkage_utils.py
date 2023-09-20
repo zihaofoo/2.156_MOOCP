@@ -1666,7 +1666,7 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
 
     for item in fixed_nodes:
             if item != driving:
-                if C[driven, item]:
+                if A[driven, item]:
                     return [], False
 
     knowns = np.concatenate([fixed_nodes,[driven]])
