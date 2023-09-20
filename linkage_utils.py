@@ -509,84 +509,84 @@ def evaluate_mechanism(C,x0,fixed_nodes, motor, target_pc, idx=None,device='cpu'
         
         return True, CD, material, sol
 
-def draw_mechanism(C,x0,fixed_nodes,motor):
-    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
-    Parameters
-    ----------
-    C:     numpy array [N,N]
-            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-    x0:    numpy array [N,2]
-            The initial positions of the 
-    fixed_nodes: numpy array [n_fixed_nodes]
-            A list of the nodes that are grounded/fixed.
-    motor: numpy array [2]
-            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-    """
+# def draw_mechanism(C,x0,fixed_nodes,motor):
+#     """Draw and simulate 2D planar mechanism and plot the traces for all nodes
+#     Parameters
+#     ----------
+#     C:     numpy array [N,N]
+#             Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#     x0:    numpy array [N,2]
+#             The initial positions of the 
+#     fixed_nodes: numpy array [n_fixed_nodes]
+#             A list of the nodes that are grounded/fixed.
+#     motor: numpy array [2]
+#             Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#     """
     
-    C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+#     C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
     
-    x = x0
-    fig = plt.figure(figsize=(12,12))
-    N = C.shape[0]
-    for i in range(N):
-        if i in fixed_nodes:
-            plt.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
-        else:
-            plt.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
+#     x = x0
+#     fig = plt.figure(figsize=(12,12))
+#     N = C.shape[0]
+#     for i in range(N):
+#         if i in fixed_nodes:
+#             plt.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
+#         else:
+#             plt.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
         
-        for j in range(0,i):
-            if C[i,j]:
-                plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
-    solver = mechanism_solver()
-    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
-    if not f1 and not f2:
-        for i in range(C.shape[0]):
-            if not i in fixed_nodes:
-                plt.plot(xo[:,i,0],xo[:,i,1])
-    else:
-        plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+#         for j in range(0,i):
+#             if C[i,j]:
+#                 plt.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
+#     solver = mechanism_solver()
+#     xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
+#     if not f1 and not f2:
+#         for i in range(C.shape[0]):
+#             if not i in fixed_nodes:
+#                 plt.plot(xo[:,i,0],xo[:,i,1])
+#     else:
+#         plt.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
         
-    plt.axis('equal')
-    plt.xlim([-0.1,1.1])
-    plt.ylim([-0.1,1.1])
+#     plt.axis('equal')
+#     plt.xlim([-0.1,1.1])
+#     plt.ylim([-0.1,1.1])
     
-def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
-    """Draw and simulate 2D planar mechanism and plot the traces for all nodes
-    Parameters
-    ----------
-    C:     numpy array [N,N]
-            Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-    x0:    numpy array [N,2]
-            The initial positions of the 
-    fixed_nodes: numpy array [n_fixed_nodes]
-            A list of the nodes that are grounded/fixed.
-    motor: numpy array [2]
-            Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-    ax:    matplotlib axis object
-            in case part of a subplot use this and pass the axis object.
-    """
-    N = C.shape[0]
-    for i in range(N):
-        if i in fixed_nodes:
-            ax.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
-        else:
-            ax.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
+# def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
+#     """Draw and simulate 2D planar mechanism and plot the traces for all nodes
+#     Parameters
+#     ----------
+#     C:     numpy array [N,N]
+#             Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#     x0:    numpy array [N,2]
+#             The initial positions of the 
+#     fixed_nodes: numpy array [n_fixed_nodes]
+#             A list of the nodes that are grounded/fixed.
+#     motor: numpy array [2]
+#             Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#     ax:    matplotlib axis object
+#             in case part of a subplot use this and pass the axis object.
+#     """
+#     N = C.shape[0]
+#     for i in range(N):
+#         if i in fixed_nodes:
+#             ax.scatter(x[i,0],x[i,1],color="Black",s=100,zorder=10)
+#         else:
+#             ax.scatter(x[i,0],x[i,1],color="Grey",s=100,zorder=10)
         
-        for j in range(i+1,N):
-            if C[i,j]:
-                ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
-    solver = mechanism_solver()
-    xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
-    if not f1 and not f2:
-        for i in range(C.shape[0]):
-            if not i in fixed_nodes:
-                ax.plot(xo[:,i,0],xo[:,i,1])
-    else:
-        ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
+#         for j in range(i+1,N):
+#             if C[i,j]:
+#                 ax.plot([x[i,0],x[j,0]],[x[i,1],x[j,1]],color="Black",linewidth=3.5)
+#     solver = mechanism_solver()
+#     xo,f1,f2 = solver.solve_rev(192,x,C,motor,fixed_nodes,False)
+#     if not f1 and not f2:
+#         for i in range(C.shape[0]):
+#             if not i in fixed_nodes:
+#                 ax.plot(xo[:,i,0],xo[:,i,1])
+#     else:
+#         ax.text(0.5, 0.5, 'Locking Or Under Defined', color='red', horizontalalignment='center', verticalalignment='center')
         
-    ax.axis('equal')
-    ax.set_xlim([-0.1,1.1])
-    ax.set_ylim([-0.1,1.1])
+#     ax.axis('equal')
+#     ax.set_xlim([-0.1,1.1])
+#     ax.set_ylim([-0.1,1.1])
 
 
 
@@ -1404,12 +1404,7 @@ def hyper_volume(F,ref):
 def evaluate_submission():
     """Evaluate CSVs in the results folder
     """
-    # Get a solver instance
-    solver = mechanism_solver()
-    
-    # Get a solver normalizer
-    normalizer = curve_normalizer(scale=False)
-    
+   
     scores = []
     
     
@@ -1431,11 +1426,11 @@ def evaluate_submission():
                 C,x0,fixed_nodes,motor,target = from_1D_representation(m)
 
                 # Solve
-                valid, CD, material, _ = evaluate_mechanism(C,x0,motor,fixed_nodes,device='cpu',timesteps=50)
+                valid, CD, material, _ = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curves[i], device='cpu',timesteps=50)
                 
                 if valid:                    
                     if CD<=0.2 and material<=5.0:
-                        F.append([cd,material])
+                        F.append([CD,material])
             if len(F):            
                 if len(F)>1000:
                     print("Over 1000 linkages submitted! Truncating submission to first 1000.")
@@ -1733,10 +1728,10 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    # valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
-    # if not valid:
-    #     print("Mechanism is invalid!")
-    #     return
+    valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    if not valid:
+        print("Mechanism is invalid!")
+        return
 
     fig = plt.figure(figsize=(12,12))
 
@@ -1808,7 +1803,10 @@ def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = n
 
 
 def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
-    
+    valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    if not valid:
+        print("Mechanism is invalid!")
+        return
     # fig = plt.figure(figsize=(12,12))
 
     def fetch_path():
