@@ -464,13 +464,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
     return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve*multiplier
 
 
-def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',timesteps=2000):
-    target_pc = get_oriented(target_pc)
-
-    if idx is None:
-        idx = C.shape[0]-1
-
-    xc = x0.copy()
+def solve_mechanism(C,x0,fixed_nodes, motor, device='cpu', timesteps=2000):
     res = sort_mech(C, x0, motor,fixed_nodes)
     if res: 
         C, x0, fixed_nodes, sorted_order = res
@@ -488,7 +482,18 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
 
     current_x0 = torch.Tensor(np.expand_dims(x0,0)).to(device)
     sol,cos = solve_rev_vectorized_batch_wds(A,current_x0,node_types,thetas)
+    material = get_mat(torch.Tensor(x0), A[0])
     if torch.isnan(sol).any():
+        return False, None, None, None
+    else:
+        return True, sol, cos, material
+
+def evaluate_mechanism(C,x0,fixed_nodes, motor, target_pc, idx=None,device='cpu',timesteps=2000):
+    if idx is None:
+        idx = C.shape[0]-1
+    target_pc = get_oriented(target_pc)
+    valid, sol, cos, material = solve_mechanism(C,x0,fixed_nodes, motor, device, timesteps)
+    if not valid:
         return False, None, None, None
     else:
         sol = sol.detach().numpy()[0,idx,:,:]
@@ -501,7 +506,7 @@ def evaluate_mechanism(C,x0,fixed_nodes,target_pc, motor, idx=None,device='cpu',
         else:
             CD = CD2
             sol = sol2
-        material = get_mat(torch.Tensor(x0), A[0])
+        
         return True, CD, material, sol
 
 def draw_mechanism(C,x0,fixed_nodes,motor):
@@ -1121,16 +1126,16 @@ def auxilary(intermidiate):
     return random_generator_ns(g_prob = intermidiate[0], n=intermidiate[1], N_min=intermidiate[2], N_max=intermidiate[3], strategy=intermidiate[4])
     
     
-def check_mechanism(C, x, motor, fixed_nodes, n_steps,device='cpu'):
-    path, valid = find_path(C, motor, fixed_nodes)
-    A = torch.Tensor(np.expand_dims(C,0)).to(device)
-    X = torch.Tensor(np.expand_dims(x,0)).to(device)
-    node_types = np.zeros([1,C.shape[0],1])
-    node_types[0,fixed_nodes,:] = 1
-    node_types = torch.Tensor(node_types).to(device)
-    thetas = torch.Tensor(np.linspace(0,np.pi*2,n_steps+1)[0:n_steps]).to(device)
-    sol, cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
-    return not torch.isnan(sol).any() and valid
+# def check_mechanism(C, x, motor, fixed_nodes, n_steps,device='cpu'):
+#     path, valid = find_path(C, motor, fixed_nodes)
+#     A = torch.Tensor(np.expand_dims(C,0)).to(device)
+#     X = torch.Tensor(np.expand_dims(x,0)).to(device)
+#     node_types = np.zeros([1,C.shape[0],1])
+#     node_types[0,fixed_nodes,:] = 1
+#     node_types = torch.Tensor(node_types).to(device)
+#     thetas = torch.Tensor(np.linspace(0,np.pi*2,n_steps+1)[0:n_steps]).to(device)
+#     sol, cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
+#     return not torch.isnan(sol).any() and valid
 
 def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand'):
     """Generate random mechanism that is not locking or invalid.
@@ -1196,7 +1201,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
         for i in range(4,n+1):
 
             sub_size = i
-            invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
+            valid, _, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+            invalid = not valid
 
             co = 0
 
@@ -1206,7 +1212,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
                 else:
                     x[0:sub_size] = np.random.uniform(low=0.0,high=1.0,size=[sub_size,2])
 
-                invalid = not check_mechanism(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], 50)
+                valid, _, _, _  = solve_mechanism(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], device = "cpu", timesteps = 50)
+                invalid = not valid
                 co+=1
 
                 if co == 100:
@@ -1225,7 +1232,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     else:
         co = 0
         x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
-        invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
+        valid, _, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+        invalid = not valid
 
         res = sort_mech(C, x, motor,fixed_nodes)
         if res: 
@@ -1236,7 +1244,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
-            invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
+            valid, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+            invalid = not valid
             co += 1
             
             if co>=1000:
@@ -1734,9 +1743,10 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    # if not check_mechanism(A,x0,motor,fixed_nodes,50):
-    #     print("Mechanism is invalid!")
-    #     return
+    valid, _, _, _ = solve_mechanism(C, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    if not valid:
+        print("Mechanism is invalid!")
+        return
 
     fig = plt.figure(figsize=(12,12))
 
