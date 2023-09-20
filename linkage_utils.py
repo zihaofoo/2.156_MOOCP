@@ -800,7 +800,10 @@ class mechanism_solver():
             if show_msg:
                 print('Incorrect motor linkage.')
             return None, -2
-
+        if motor[0] not in fixed_nodes.tolist() and motor[1] not in fixed_nodes.tolist():
+            if show_msg:
+                print('Incorrect motor linkage.')
+            return None, -2
         for item in fixed_nodes:
             if item != motor[0]:
                 if C[motor[1], item]:
