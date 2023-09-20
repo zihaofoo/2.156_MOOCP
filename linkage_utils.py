@@ -1136,7 +1136,7 @@ def auxilary(intermidiate):
     return random_generator_ns(g_prob = intermidiate[0], n=intermidiate[1], N_min=intermidiate[2], N_max=intermidiate[3], strategy=intermidiate[4])
     
     
-def check(C, x, motor, fixed_nodes, n_steps,device='cpu'):
+def check_mechanism(C, x, motor, fixed_nodes, n_steps,device='cpu'):
     path, valid = find_path(C, motor, fixed_nodes)
     A = torch.Tensor(np.expand_dims(C,0)).to(device)
     X = torch.Tensor(np.expand_dims(x,0)).to(device)
@@ -1211,7 +1211,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
         for i in range(4,n+1):
 
             sub_size = i
-            invalid = not check(C, x, motor, fixed_nodes, 50)
+            invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
 
             co = 0
 
@@ -1221,7 +1221,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
                 else:
                     x[0:sub_size] = np.random.uniform(low=0.0,high=1.0,size=[sub_size,2])
 
-                invalid = not check(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], 50)
+                invalid = not check_mechanism(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], 50)
                 co+=1
 
                 if co == 100:
@@ -1240,7 +1240,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     else:
         co = 0
         x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
-        invalid = not check(C, x, motor, fixed_nodes, 50)
+        invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
 
         res = sort_mech(C, x, motor,fixed_nodes)
         if res: 
@@ -1251,7 +1251,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
-            invalid = not check(C, x, motor, fixed_nodes, 50)
+            invalid = not check_mechanism(C, x, motor, fixed_nodes, 50)
             co += 1
             
             if co>=1000:
@@ -1760,7 +1760,7 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    if not check(A,x0,motor,fixed_nodes,50):
+    if not check_mechanism(A,x0,motor,fixed_nodes,50):
         print("Mechanism is invalid!")
         return
 
