@@ -1244,7 +1244,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
-            valid, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+            valid, _, _, _= solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
             invalid = not valid
             co += 1
             
