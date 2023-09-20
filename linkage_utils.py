@@ -1383,13 +1383,13 @@ def evaluate_submission():
     target_curves = []
 
     # Read every file separately and append to the list
-    for i in range(20):
+    for i in range(6):
         if not os.path.exists('./data/%i.csv'%(i)):
             raise IOError('Could not find %i.csv in the data folder'%(i))
         target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
     
     
-    for i in trange(20):
+    for i in trange(6):
         if os.path.exists('./results/%i.csv'%i):
             
             mechanisms = get_population_csv('./results/%i.csv'%i)
@@ -1411,20 +1411,20 @@ def evaluate_submission():
                     cd = chamfer_distance(out_pc,target_curves[i],subsample=False)
                     material = solver.material(x0,C)
                     
-                    if cd<=30 and material<=6.0:
+                    if cd<=0.2 and material<=5.0:
                         F.append([cd,material])
             if len(F):            
                 if len(F)>1000:
                     print("Over 1000 linkages submitted! Truncating submission to first 1000.")
                     F=F[:1000]
-                scores.append(hyper_volume(np.array(F),[30,6.0]))
+                scores.append(hyper_volume(np.array(F),[0.2,5.0]))
             else:
                 scores.append(0)
         else:
             scores.append(0)
     
     print('Score Break Down:')
-    for i in range(20):
+    for i in range(6):
         print('Curve %i: %f'%(i,scores[i]))
     
     print('Overall Score: %f'%(np.mean(scores)))
