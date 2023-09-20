@@ -796,6 +796,12 @@ class mechanism_solver():
             if show_msg:
                 print('Incorrect motor linkage.')
             return None, -2
+
+        for item in fixed_nodes:
+            if C[motor[1], item]:
+                if show_msg:
+                    print('Incorrect motor linkage.')
+                return None, -2
         
         visited_list[motor[1]] = True
         
@@ -814,9 +820,9 @@ class mechanism_solver():
         vn = neighbors[visited_list[neighbors]]
         if vn.shape[0]>2:
             if show_msg:
-                print('Redudndant or overdefined system.')
+                print('Redundant or overdefined system.')
             return None, -2
-        
+
         hanging_nodes = np.where(C.sum(0)==0)[0]
         for hn in hanging_nodes:
             if not hn in fixed_nodes.tolist():
@@ -838,7 +844,7 @@ class mechanism_solver():
             if vn.shape[0]>1:
                 if vn.shape[0]>2:
                     if show_msg:
-                        print('Redudndant or overdefined system.')
+                        print('Redundant or overdefined system.')
                     return None, -2
                 i = vn[0]
                 j = vn[1]
