@@ -588,101 +588,86 @@ def draw_mechanism_on_ax(C,x,fixed_nodes,motor,ax):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def line_segment(start, end):
-    """Bresenham's Line Algorithm
-    Parameters
-    ----------
-    start: numpy array or list with size [2]
-            The start of the line segment being rasterized. 
-    end:   numpy array or list with size [2]
-            The end of the line segment being rasterized.
+# def line_segment(start, end):
+#     """Bresenham's Line Algorithm
+#     Parameters
+#     ----------
+#     start: numpy array or list with size [2]
+#             The start of the line segment being rasterized. 
+#     end:   numpy array or list with size [2]
+#             The end of the line segment being rasterized.
     
-    Returns
-    -------
-    points: numpy array [n_point,2].
-        computed coordinates of the pixels needed to display the line segment inputted.
-    """
-    # Setup initial conditions
-    x1, y1 = start[0], start[1]
-    x2, y2 = end[0], end[1]
-    dx = x2 - x1
-    dy = y2 - y1
+#     Returns
+#     -------
+#     points: numpy array [n_point,2].
+#         computed coordinates of the pixels needed to display the line segment inputted.
+#     """
+#     # Setup initial conditions
+#     x1, y1 = start[0], start[1]
+#     x2, y2 = end[0], end[1]
+#     dx = x2 - x1
+#     dy = y2 - y1
  
-    # Determine how steep the line is
-    is_steep = np.abs(dy) > np.abs(dx)
+#     # Determine how steep the line is
+#     is_steep = np.abs(dy) > np.abs(dx)
  
-    # Rotate line
-    if is_steep:
-        x1, y1 = y1, x1
-        x2, y2 = y2, x2
+#     # Rotate line
+#     if is_steep:
+#         x1, y1 = y1, x1
+#         x2, y2 = y2, x2
  
-    # Swap start and end points if necessary and store swap state
-    swapped = False
-    if x1 > x2:
-        x1, x2 = x2, x1
-        y1, y2 = y2, y1
-        swapped = True
+#     # Swap start and end points if necessary and store swap state
+#     swapped = False
+#     if x1 > x2:
+#         x1, x2 = x2, x1
+#         y1, y2 = y2, y1
+#         swapped = True
  
-    # Recalculate differentials
-    dx = x2 - x1
-    dy = y2 - y1
+#     # Recalculate differentials
+#     dx = x2 - x1
+#     dy = y2 - y1
  
-    # Calculate error
-    error = int(dx / 2.0)
-    ystep = 1 if y1 < y2 else -1
+#     # Calculate error
+#     error = int(dx / 2.0)
+#     ystep = 1 if y1 < y2 else -1
  
-    # Iterate over bounding box generating points between start and end
-    y = y1
-    points = []
-    for x in range(x1, x2 + 1):
-        coord = (y, x) if is_steep else (x, y)
-        points.append(coord)
-        error -= abs(dy)
-        if error < 0:
-            y += ystep
-            error += dx
+#     # Iterate over bounding box generating points between start and end
+#     y = y1
+#     points = []
+#     for x in range(x1, x2 + 1):
+#         coord = (y, x) if is_steep else (x, y)
+#         points.append(coord)
+#         error -= abs(dy)
+#         if error < 0:
+#             y += ystep
+#             error += dx
  
-    # Reverse the list if the coordinates were swapped
-    if swapped:
-        points.reverse()
-    return points
+#     # Reverse the list if the coordinates were swapped
+#     if swapped:
+#         points.reverse()
+#     return points
 
-def rasterized_curve_coords(curve, res):
-    """Rasterize curves into point clouds standardized into a grid of specified resolution
-    Parameters
-    ----------
-    curve:  numpy array [n_point,2].
-                Coordinates of a curve that fits within a 1x1 box (i.e., coordinates normalized to the range [0,1])
-    res:    int
-                Resolution of the grid the curve is being rasterized to (e.g. res=500 means rasterize to a grid of 500x500)
-    Returns
-    -------
-    points: numpy array [n,2].
-                computed coordinates of the pixels needed to display the curve within the specified resolution.
-    """
-    c = np.minimum(res-1,np.floor(curve*res)).astype(np.int32)
-    ps = []
-    for i in range(curve.shape[0]-1):
-        ps += line_segment(c[i],c[i+1])
+# def rasterized_curve_coords(curve, res):
+#     """Rasterize curves into point clouds standardized into a grid of specified resolution
+#     Parameters
+#     ----------
+#     curve:  numpy array [n_point,2].
+#                 Coordinates of a curve that fits within a 1x1 box (i.e., coordinates normalized to the range [0,1])
+#     res:    int
+#                 Resolution of the grid the curve is being rasterized to (e.g. res=500 means rasterize to a grid of 500x500)
+#     Returns
+#     -------
+#     points: numpy array [n,2].
+#                 computed coordinates of the pixels needed to display the curve within the specified resolution.
+#     """
+#     c = np.minimum(res-1,np.floor(curve*res)).astype(np.int32)
+#     ps = []
+#     for i in range(curve.shape[0]-1):
+#         ps += line_segment(c[i],c[i+1])
 
-    out = np.array(list(set(ps)))
+#     out = np.array(list(set(ps)))
     
-    return out
+#     return out
 
 
 
@@ -1624,30 +1609,19 @@ def visualize_pareto_front(mechanisms,F,target_curve):
     
     fig, axs = plt.subplots(X_p.shape[0], 3,figsize=(15,5*X_p.shape[0]))
     
-    # Get a solver instance
-    solver = mechanism_solver()
-    # Get a solver normalizer
-    normalizer = curve_normalizer(scale=False)
-    
     for i in trange(X_p.shape[0]):
         C,x0,fixed_nodes,motor,target = from_1D_representation(X_p[i])
         draw_mechanism_on_ax(C,x0,fixed_nodes,motor,axs[i,0])
 
         # Solve
-        x_sol, locking,over_under_defined = solver.solve_rev(200,x0,C,motor,fixed_nodes,False)
-
-        # Normalize
-        x_norm = normalizer.get_oriented(x_sol[:,target,:])
-
-        # Step 4: Rasterize
-        out_pc = rasterized_curve_coords(x_norm,500)
+        valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes,motor,target_curve)
 
         # Plot
         axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
-        axs[i,1].scatter(out_pc[:,0],out_pc[:,1],s=2)
+        axs[i,1].scatter(sol[:,0],sol[:,1],s=2)
         axs[i,1].axis('equal')
 
-        axs[i,1].set_title('Chamfer Distance: %f'%(chamfer_distance(out_pc,target_curve)))
+        axs[i,1].set_title('Chamfer Distance: %f'%(CD))
         
         axs[i,2].scatter(F_p[:,1],F_p[:,0])
         axs[i,2].set_xlabel('Material Use')
@@ -1760,9 +1734,9 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    if not check_mechanism(A,x0,motor,fixed_nodes,50):
-        print("Mechanism is invalid!")
-        return
+    # if not check_mechanism(A,x0,motor,fixed_nodes,50):
+    #     print("Mechanism is invalid!")
+    #     return
 
     fig = plt.figure(figsize=(12,12))
 
