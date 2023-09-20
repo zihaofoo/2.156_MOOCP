@@ -790,7 +790,7 @@ class mechanism_solver():
         if (C != C.T).any():
             if show_msg:
                 print('Asymmetric Connectivity Matrix.')
-            return None, -1
+            return None, -3
         
         if motor[1] in fixed_nodes.tolist():
             t = motor[0]
@@ -815,7 +815,7 @@ class mechanism_solver():
         if (~C.any(axis=0)).any():
             if show_msg:
                 print('Disconnected node.')
-            return None, 0
+            return None, -4
 
 
         
