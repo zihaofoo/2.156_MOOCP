@@ -312,7 +312,7 @@ def sort_mech(A, x0, motor,fixed_nodes):
     motor_first_order = np.concatenate([motor,motor_first_order])
 
  
-
+    
     A = A[motor_first_order,:][:,motor_first_order]
     x0 = x0[motor_first_order]
     nt = nt[motor_first_order]
@@ -1651,13 +1651,23 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
     path = []
     
     A,fixed_nodes,motor = np.array(A),np.array(fixed_nodes),np.array(motor)
-    
+
+    if (A != A.T).any():
+        return [], False
+
     unknowns = np.array(list(range(A.shape[0])))
 
     if motor[-1] in fixed_nodes:
         driven = motor[0]
+        driving = motor[-1]
     else:
         driven = motor[-1]
+        driving = motor[0]
+
+    for item in fixed_nodes:
+            if item != driving:
+                if C[driven, item]:
+                    return [], False
 
     knowns = np.concatenate([fixed_nodes,[driven]])
     
