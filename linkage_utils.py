@@ -320,7 +320,7 @@ def sort_mech(A, x0, motor,fixed_nodes):
 
  
 
-    if check:
+    if check and p.shape>1:
         fixed_nodes = np.where(nt[1:])[0]+1
         sorted_order = np.concatenate([[0,1],fixed_nodes,p[:,0]])
         A = A[sorted_order,:][:,sorted_order]
@@ -1675,7 +1675,7 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
             return [], False
         else:
             counter += 1
-    
+    if len(path)
     return np.array(path), True
 
 def get_G(x0):
