@@ -1760,6 +1760,10 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
+    if not check(A,x0,motor,fixed_nodes,50):
+        print("Mechanism is invalid!")
+        return
+
     fig = plt.figure(figsize=(12,12))
 
     def fetch_path():
