@@ -1641,6 +1641,9 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
         driven = motor[-1]
         driving = motor[0]
 
+    if motor[-1] not in fixed_nodes and motor[0] not in fixed_nodes:
+        return [], False
+
     for item in fixed_nodes:
             if item != driving:
                 if A[driven, item]:
