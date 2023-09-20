@@ -686,412 +686,412 @@ def rasterized_curve_coords(curve, res):
 
 
 
-class mechanism_solver():
-    def __init__(self):
-        """Instance of a solver which outputs the path taken by nodes of a mechanims
-        """
-        pass
+# class mechanism_solver():
+#     def __init__(self):
+#         """Instance of a solver which outputs the path taken by nodes of a mechanims
+#         """
+#         pass
     
-    def find_neighbors(self, index, C):
-        """Find neighbors of a node (i.e., nodes that are connected to the node of interest)
-        Parameters
-        ----------
-        index: int
-                Index of the node neighbours are needed for.
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        Returns
-        -------
-        neigbours: numpy array [n_neighbours].
-                 List of the neigbours for the input node.
-        """
-        return np.where(C[index])[0]
+#     def find_neighbors(self, index, C):
+#         """Find neighbors of a node (i.e., nodes that are connected to the node of interest)
+#         Parameters
+#         ----------
+#         index: int
+#                 Index of the node neighbours are needed for.
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         Returns
+#         -------
+#         neigbours: numpy array [n_neighbours].
+#                  List of the neigbours for the input node.
+#         """
+#         return np.where(C[index])[0]
     
-    def find_unvisited_neighbors(self, index, C, visited_list):
-        """Find neighbors of a node that are not visited (i.e., neighbours that are not solved yet)
-        Parameters
-        ----------
-        index: int
-                Index of the node neighbours are needed for.
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        visited_list: numpy array [N]
-                 A list of booleans indicated wether the node with the index of the element in this array has been visited.
-        Returns
-        -------
-        visted neigbours: numpy array [n_neighbours].
-                 List of the visited neigbours for the input node.
-        """
-        return np.where(np.logical_and(C[index],np.logical_not(visited_list)))[0]
+#     def find_unvisited_neighbors(self, index, C, visited_list):
+#         """Find neighbors of a node that are not visited (i.e., neighbours that are not solved yet)
+#         Parameters
+#         ----------
+#         index: int
+#                 Index of the node neighbours are needed for.
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         visited_list: numpy array [N]
+#                  A list of booleans indicated wether the node with the index of the element in this array has been visited.
+#         Returns
+#         -------
+#         visted neigbours: numpy array [n_neighbours].
+#                  List of the visited neigbours for the input node.
+#         """
+#         return np.where(np.logical_and(C[index],np.logical_not(visited_list)))[0]
     
-    def get_G(self, x0, C):
-        """Get distance matrix for a mechanism
-        Parameters
-        ----------
-        x0:    numpy array [N,2]
-            The initial positions of the 
-        C:     numpy array [N,N]
-                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#     def get_G(self, x0, C):
+#         """Get distance matrix for a mechanism
+#         Parameters
+#         ----------
+#         x0:    numpy array [N,2]
+#             The initial positions of the 
+#         C:     numpy array [N,N]
+#                  Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
         
-        Returns
-        -------
-        G:     numpy array [N,N].
-                 distance between nodes that are connected and infinity if nodes are not connected constructed similar to C.
-        """
-        N = C.shape[0]
-        G = np.zeros_like(C, dtype=float)
-        for i in range(N):
-            for j in range(i):
-                if C[i,j]:
-                    G[i,j] = G[j,i] = np.linalg.norm(x0[i]-x0[j])
-                else:
-                    G[i,j] = G[j,i] = np.inf
+#         Returns
+#         -------
+#         G:     numpy array [N,N].
+#                  distance between nodes that are connected and infinity if nodes are not connected constructed similar to C.
+#         """
+#         N = C.shape[0]
+#         G = np.zeros_like(C, dtype=float)
+#         for i in range(N):
+#             for j in range(i):
+#                 if C[i,j]:
+#                     G[i,j] = G[j,i] = np.linalg.norm(x0[i]-x0[j])
+#                 else:
+#                     G[i,j] = G[j,i] = np.inf
                     
-        return G
+#         return G
     
-    def get_path(self, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get Path to solution
-        Parameters
-        ----------
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        Path:  numpy array [n_steps].
-                Order of solving nodes.
-        op:
-               numpy array [n_steps,2]
-                Nodes used to solve for specific step.
-        """
+#     def get_path(self, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get Path to solution
+#         Parameters
+#         ----------
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         Path:  numpy array [n_steps].
+#                 Order of solving nodes.
+#         op:
+#                numpy array [n_steps,2]
+#                 Nodes used to solve for specific step.
+#         """
         
-        C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
-        theta = 0.0
+#         C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
+#         theta = 0.0
         
-        path = []
-        op = []
+#         path = []
+#         op = []
         
-        N = C.shape[0]
-        x = np.zeros((N, 2))
-        visited_list = np.zeros(N, dtype=bool)
-        active_list = []
+#         N = C.shape[0]
+#         x = np.zeros((N, 2))
+#         visited_list = np.zeros(N, dtype=bool)
+#         active_list = []
         
-        visited_list[fixed_nodes] = True
+#         visited_list[fixed_nodes] = True
         
-        if (C != C.T).any():
-            if show_msg:
-                print('Asymmetric Connectivity Matrix.')
-            return None, -3
+#         if (C != C.T).any():
+#             if show_msg:
+#                 print('Asymmetric Connectivity Matrix.')
+#             return None, -3
         
-        if motor[1] in fixed_nodes.tolist():
-            t = motor[0]
-            motor[0] = motor[1]
-            motor[1] = t
-        elif not motor[0] in fixed_nodes.tolist():
-            if show_msg:
-                print('Incorrect motor linkage.')
-            return None, -2
-        if motor[0] not in fixed_nodes.tolist() and motor[1] not in fixed_nodes.tolist():
-            if show_msg:
-                print('Incorrect motor linkage.')
-            return None, -2
-        for item in fixed_nodes:
-            if item != motor[0]:
-                if C[motor[1], item]:
-                    print([motor[1], item])
-                    if show_msg:
-                        print('Driven node linked to ground.')
-                    return None, -2
+#         if motor[1] in fixed_nodes.tolist():
+#             t = motor[0]
+#             motor[0] = motor[1]
+#             motor[1] = t
+#         elif not motor[0] in fixed_nodes.tolist():
+#             if show_msg:
+#                 print('Incorrect motor linkage.')
+#             return None, -2
+#         if motor[0] not in fixed_nodes.tolist() and motor[1] not in fixed_nodes.tolist():
+#             if show_msg:
+#                 print('Incorrect motor linkage.')
+#             return None, -2
+#         for item in fixed_nodes:
+#             if item != motor[0]:
+#                 if C[motor[1], item]:
+#                     print([motor[1], item])
+#                     if show_msg:
+#                         print('Driven node linked to ground.')
+#                     return None, -2
 
-        if (~C.any(axis=0)).any():
-            if show_msg:
-                print('Disconnected node.')
-            return None, -4
+#         if (~C.any(axis=0)).any():
+#             if show_msg:
+#                 print('Disconnected node.')
+#             return None, -4
 
 
         
-        visited_list[motor[1]] = True
+#         visited_list[motor[1]] = True
         
-        x[fixed_nodes] = x0[fixed_nodes]
+#         x[fixed_nodes] = x0[fixed_nodes]
         
-        dx = x0[motor[1],0] - x0[motor[0],0]
-        dy = x0[motor[1],1] - x0[motor[0],1]
+#         dx = x0[motor[1],0] - x0[motor[0],0]
+#         dy = x0[motor[1],1] - x0[motor[0],1]
         
-        theta_0 = np.math.atan2(dy,dx)
-        theta = theta_0 + theta
+#         theta_0 = np.math.atan2(dy,dx)
+#         theta = theta_0 + theta
         
-        x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
-        x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
+#         x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
+#         x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
         
-        neighbors = self.find_neighbors(motor[1], C)
-        vn = neighbors[visited_list[neighbors]]
-        if vn.shape[0]>2:
-            if show_msg:
-                print('Redundant or overdefined system.')
-            return None, -2
+#         neighbors = self.find_neighbors(motor[1], C)
+#         vn = neighbors[visited_list[neighbors]]
+#         if vn.shape[0]>2:
+#             if show_msg:
+#                 print('Redundant or overdefined system.')
+#             return None, -2
 
-        hanging_nodes = np.where(C.sum(0)==0)[0]
-        for hn in hanging_nodes:
-            if not hn in fixed_nodes.tolist():
-                if show_msg:
-                    print('DOF larger than 1.')
-                return None, 0
+#         hanging_nodes = np.where(C.sum(0)==0)[0]
+#         for hn in hanging_nodes:
+#             if not hn in fixed_nodes.tolist():
+#                 if show_msg:
+#                     print('DOF larger than 1.')
+#                 return None, 0
         
-        for i in np.where(visited_list)[0]:            
-            active_list += list(self.find_unvisited_neighbors(i, C, visited_list))
+#         for i in np.where(visited_list)[0]:            
+#             active_list += list(self.find_unvisited_neighbors(i, C, visited_list))
             
-        active_list = list(set(active_list))
+#         active_list = list(set(active_list))
         
-        counter = 0
+#         counter = 0
         
-        while len(active_list)>0:
-            k = active_list.pop(0)
-            neighbors = self.find_neighbors(k, C)
-            vn = neighbors[visited_list[neighbors]]
-            if vn.shape[0]>1:
-                if vn.shape[0]>2:
-                    if show_msg:
-                        print('Redundant or overdefined system.')
-                    return None, -2
-                i = vn[0]
-                j = vn[1]
-                l_ij = np.linalg.norm(x[j]-x[i])
-                s = np.sign((x0[i,1]-x0[k,1])*(x0[i,0]-x0[j,0]) - (x0[i,1]-x0[j,1])*(x0[i,0]-x0[k,0]))
-                cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
-                if cosphi >= -1.0 and cosphi <= 1.0:
-                    phi = s * acos(cosphi)
-                    R = np.array([[cos(phi), -sin(phi)],
-                                  [sin(phi), cos(phi)]])
-                    scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
-                    x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
-                    path.append(k)
-                    op.append([i,j,s])
-                else:
-                    if show_msg:
-                        print('Locking or degenerate linkage!')
-                    return None, -1
+#         while len(active_list)>0:
+#             k = active_list.pop(0)
+#             neighbors = self.find_neighbors(k, C)
+#             vn = neighbors[visited_list[neighbors]]
+#             if vn.shape[0]>1:
+#                 if vn.shape[0]>2:
+#                     if show_msg:
+#                         print('Redundant or overdefined system.')
+#                     return None, -2
+#                 i = vn[0]
+#                 j = vn[1]
+#                 l_ij = np.linalg.norm(x[j]-x[i])
+#                 s = np.sign((x0[i,1]-x0[k,1])*(x0[i,0]-x0[j,0]) - (x0[i,1]-x0[j,1])*(x0[i,0]-x0[k,0]))
+#                 cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
+#                 if cosphi >= -1.0 and cosphi <= 1.0:
+#                     phi = s * acos(cosphi)
+#                     R = np.array([[cos(phi), -sin(phi)],
+#                                   [sin(phi), cos(phi)]])
+#                     scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
+#                     x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
+#                     path.append(k)
+#                     op.append([i,j,s])
+#                 else:
+#                     if show_msg:
+#                         print('Locking or degenerate linkage!')
+#                     return None, -1
                 
-                visited_list[k] = True
-                active_list += list(self.find_unvisited_neighbors(k, C, visited_list))
-                active_list = list(set(active_list))
-                counter = 0
-            else:
-                counter += 1
-                active_list.append(k)
+#                 visited_list[k] = True
+#                 active_list += list(self.find_unvisited_neighbors(k, C, visited_list))
+#                 active_list = list(set(active_list))
+#                 counter = 0
+#             else:
+#                 counter += 1
+#                 active_list.append(k)
             
-            if counter > len(active_list):
-                if show_msg:
-                    print('DOF larger than 1.')
-                return None, 0
-        return path, op
+#             if counter > len(active_list):
+#                 if show_msg:
+#                     print('DOF larger than 1.')
+#                 return None, 0
+#         return path, op
     
-    def position_from_path(self, path, op, theta, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get position at specific angle to solution
-        Parameters
-        ----------
-        Path:  numpy array [n_steps].
-                Order of solving nodes.
-        op:
-               numpy array [n_steps,2]
-                Nodes used to solve for specific step.
-        theta: float
-                Deviation from initial position angle at the motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     numpy array [N,2].
-                Positions of nodes at given angle.
-        """
+#     def position_from_path(self, path, op, theta, x0, C, G, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get position at specific angle to solution
+#         Parameters
+#         ----------
+#         Path:  numpy array [n_steps].
+#                 Order of solving nodes.
+#         op:
+#                numpy array [n_steps,2]
+#                 Nodes used to solve for specific step.
+#         theta: float
+#                 Deviation from initial position angle at the motor.
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         x:     numpy array [N,2].
+#                 Positions of nodes at given angle.
+#         """
         
-        C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
-        N = C.shape[0]
-        x = np.zeros((N, 2))
-        visited_list = np.zeros(N, dtype=bool)
-        active_list = []
+#         C,x0,fixed_nodes,motor,G = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor),np.array(G)
+#         N = C.shape[0]
+#         x = np.zeros((N, 2))
+#         visited_list = np.zeros(N, dtype=bool)
+#         active_list = []
         
-        visited_list[fixed_nodes] = True
+#         visited_list[fixed_nodes] = True
         
         
-        if motor[1] in fixed_nodes.tolist():
-            t = motor[0]
-            motor[0] = motor[1]
-            motor[1] = t
-        elif not motor[0] in fixed_nodes.tolist():
-            if show_msg:
-                print('Incorrect motor linkage.')
-            return None, -2
+#         if motor[1] in fixed_nodes.tolist():
+#             t = motor[0]
+#             motor[0] = motor[1]
+#             motor[1] = t
+#         elif not motor[0] in fixed_nodes.tolist():
+#             if show_msg:
+#                 print('Incorrect motor linkage.')
+#             return None, -2
         
-        for item in fixed_nodes:
-            if item != motor[0]:
-                if C[motor[1], item]:
-                    print([motor[1], item])
-                    if show_msg:
-                        print('Incorrect motor linkage.')
-                    return None, -2
+#         for item in fixed_nodes:
+#             if item != motor[0]:
+#                 if C[motor[1], item]:
+#                     print([motor[1], item])
+#                     if show_msg:
+#                         print('Incorrect motor linkage.')
+#                     return None, -2
 
-        visited_list[motor[1]] = True
+#         visited_list[motor[1]] = True
         
-        x[fixed_nodes] = x0[fixed_nodes]
+#         x[fixed_nodes] = x0[fixed_nodes]
         
-        dx = x0[motor[1],0] - x0[motor[0],0]
-        dy = x0[motor[1],1] - x0[motor[0],1]
+#         dx = x0[motor[1],0] - x0[motor[0],0]
+#         dy = x0[motor[1],1] - x0[motor[0],1]
         
-        theta_0 = np.math.atan2(dy,dx)
-        theta = theta_0 + theta
+#         theta_0 = np.math.atan2(dy,dx)
+#         theta = theta_0 + theta
         
-        x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
-        x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
+#         x[motor[1], 0] = x[motor[0],0] + G[motor[0],motor[1]] * np.cos(theta)
+#         x[motor[1], 1] = x[motor[0],1] + G[motor[0],motor[1]] * np.sin(theta)
         
         
-        for l,step in enumerate(path):
-            i = op[l][0]
-            j = op[l][1]
-            k = step
+#         for l,step in enumerate(path):
+#             i = op[l][0]
+#             j = op[l][1]
+#             k = step
             
-            l_ij = np.linalg.norm(x[j]-x[i])
-            cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
-            if cosphi >= -1.0 and cosphi <= 1.0:
-                phi = op[l][2] * acos(cosphi)
-                R = np.array([[cos(phi), -sin(phi)],
-                              [sin(phi), cos(phi)]])
-                scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
-                x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
-            else:
-                if show_msg:
-                    print('Locking or degenerate linkage!')
-                return np.abs(cosphi)
-        return x
+#             l_ij = np.linalg.norm(x[j]-x[i])
+#             cosphi = (l_ij**2+G[i,k]**2-G[j,k]**2)/(2*l_ij*G[i,k])
+#             if cosphi >= -1.0 and cosphi <= 1.0:
+#                 phi = op[l][2] * acos(cosphi)
+#                 R = np.array([[cos(phi), -sin(phi)],
+#                               [sin(phi), cos(phi)]])
+#                 scaled_ij = (x[j]-x[i])/l_ij * G[i,k]
+#                 x[k] = np.matmul(R, scaled_ij.reshape(2,1)).flatten() + x[i]
+#             else:
+#                 if show_msg:
+#                     print('Locking or degenerate linkage!')
+#                 return np.abs(cosphi)
+#         return x
     
-    def solve_rev(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
-        """Get path traced by mechanism nodes for one revolution of the motor for a number of descrete steps.
-        Parameters
-        ----------
-        n_steps:    int
-                Number of descrete steps to solve the mechanism at for the entire revolution of motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     numpy array [n_steps,N,2].
-                Positions of nodes at each angle steps for the entire revolution.
-        """
+#     def solve_rev(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """Get path traced by mechanism nodes for one revolution of the motor for a number of descrete steps.
+#         Parameters
+#         ----------
+#         n_steps:    int
+#                 Number of descrete steps to solve the mechanism at for the entire revolution of motor.
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         x:     numpy array [n_steps,N,2].
+#                 Positions of nodes at each angle steps for the entire revolution.
+#         """
         
         
-        C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+#         C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
         
-        for j in fixed_nodes:
-            if j!=motor[1]:
-                if C[j, motor[0]]==1 or C[motor[0], j]==1:
-                    return np.zeros([n_steps,C.shape[0],2]), True, False
-        if motor[0] in fixed_nodes:
-            return np.zeros([n_steps,C.shape[0],2]), True, False
+#         for j in fixed_nodes:
+#             if j!=motor[1]:
+#                 if C[j, motor[0]]==1 or C[motor[0], j]==1:
+#                     return np.zeros([n_steps,C.shape[0],2]), True, False
+#         if motor[0] in fixed_nodes:
+#             return np.zeros([n_steps,C.shape[0],2]), True, False
 
 
-        pop = find_path(C,motor,fixed_nodes)
+#         pop = find_path(C,motor,fixed_nodes)
         
 
-        if not pop[1]:
-            return np.zeros([n_steps,C.shape[0],2]), False, True
+#         if not pop[1]:
+#             return np.zeros([n_steps,C.shape[0],2]), False, True
         
-        out = solve_rev_vectorized(pop[0],x0,get_G(x0),motor,fixed_nodes,np.linspace(0, 2*np.pi, n_steps))[0]
-        out = np.transpose(out,axes=[1,0,2])
+#         out = solve_rev_vectorized(pop[0],x0,get_G(x0),motor,fixed_nodes,np.linspace(0, 2*np.pi, n_steps))[0]
+#         out = np.transpose(out,axes=[1,0,2])
 
-        if np.isnan(out).sum() > 0:
-            return np.zeros([n_steps,C.shape[0],2]), True, False
+#         if np.isnan(out).sum() > 0:
+#             return np.zeros([n_steps,C.shape[0],2]), True, False
         
-        return np.array(out), False, False
+#         return np.array(out), False, False
     
-    def check(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
-        """check validity of mechanism (used for random generator).
-        Parameters
-        ----------
-        n_steps:    int
-                Number of descrete steps to solve the mechanism at for the entire revolution of motor.
-        x0:    numpy array [N,2]
-                The initial positions of the 
-        C:     numpy array [N,N]
-                Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
-        G:     numpy array [N,N].
-                Distance matrix of the palanar linkage mechanism.
-        motor: numpy array [2]
-                Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
-        fixed_nodes: numpy array [n_fixed_nodes]
-                A list of the nodes that are grounded/fixed.
-        show_msg: boolean
-                Will show messages if True. Default: False.
-        Returns
-        -------
-        x:     boolean.
-                whether mechanism is valid or not.
-        """
+#     def check(self, n_steps, x0, C, motor, fixed_nodes=[0, 1], show_msg=False):
+#         """check validity of mechanism (used for random generator).
+#         Parameters
+#         ----------
+#         n_steps:    int
+#                 Number of descrete steps to solve the mechanism at for the entire revolution of motor.
+#         x0:    numpy array [N,2]
+#                 The initial positions of the 
+#         C:     numpy array [N,N]
+#                 Adjacency/Conncetivity matrix describing the structure of the palanar linkage mechanism.
+#         G:     numpy array [N,N].
+#                 Distance matrix of the palanar linkage mechanism.
+#         motor: numpy array [2]
+#                 Start and end nodes of the driven linkage (Note: this linkage must be connected to ground on one end). 
+#         fixed_nodes: numpy array [n_fixed_nodes]
+#                 A list of the nodes that are grounded/fixed.
+#         show_msg: boolean
+#                 Will show messages if True. Default: False.
+#         Returns
+#         -------
+#         x:     boolean.
+#                 whether mechanism is valid or not.
+#         """
         
-        C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
-        G = self.get_G(x0,C)
+#         C,x0,fixed_nodes,motor = np.array(C),np.array(x0),np.array(fixed_nodes),np.array(motor)
+#         G = self.get_G(x0,C)
         
-        pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
+#         pop = self.get_path(x0, C, G, motor, fixed_nodes, show_msg)
 
-        if not pop[0]:
-            if pop[1] == 0:
-                return False
-            elif pop[1] == -1:
-                return False
-            elif pop[1] == -2:
-                return False
+#         if not pop[0]:
+#             if pop[1] == 0:
+#                 return False
+#             elif pop[1] == -1:
+#                 return False
+#             elif pop[1] == -2:
+#                 return False
             
-        func = lambda t: self.position_from_path(pop[0],pop[1],t, x0, C, G, motor, fixed_nodes, show_msg)
+#         func = lambda t: self.position_from_path(pop[0],pop[1],t, x0, C, G, motor, fixed_nodes, show_msg)
         
-        ts = np.linspace(0, 2*np.pi, n_steps)
+#         ts = np.linspace(0, 2*np.pi, n_steps)
         
-        out = []
+#         out = []
         
-        for t in ts:
-            x_temp = func(t)
-            if np.array(x_temp).size == 1:
-                if x_temp:
-                    return False
-                else:
-                    return False
-            else:
-                out.append(x_temp)
+#         for t in ts:
+#             x_temp = func(t)
+#             if np.array(x_temp).size == 1:
+#                 if x_temp:
+#                     return False
+#                 else:
+#                     return False
+#             else:
+#                 out.append(x_temp)
         
-        if np.max(out)>1.0 or np.min(out)<0.0 :
-            return False
-        else:
-            return True
+#         if np.max(out)>1.0 or np.min(out)<0.0 :
+#             return False
+#         else:
+#             return True
     
-    def material(self,x0, C):
-        G = self.get_G(x0,C)
-        return np.sum(G[np.logical_not(np.isinf(G))])    
+#     def material(self,x0, C):
+#         G = self.get_G(x0,C)
+#         return np.sum(G[np.logical_not(np.isinf(G))])    
 
 def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', show_progress=True):
     """Fast generate a batch of random mechanisms that are not locking or invalid.
@@ -1136,6 +1136,17 @@ def auxilary(intermidiate):
     return random_generator_ns(g_prob = intermidiate[0], n=intermidiate[1], N_min=intermidiate[2], N_max=intermidiate[3], strategy=intermidiate[4])
     
     
+def check(C, x, motor, fixed_nodes, n_steps,device='cpu'):
+    path, valid = find_path(C, motor, fixed_nodes)
+    A = torch.Tensor(np.expand_dims(C,0)).to(device)
+    X = torch.Tensor(np.expand_dims(x,0)).to(device)
+    node_types = np.zeros([1,C.shape[0],1])
+    node_types[0,fixed_nodes,:] = 1
+    node_types = torch.Tensor(node_types).to(device)
+    thetas = torch.Tensor(np.linspace(0,np.pi*2,n_steps+1)[0:n_steps]).to(device)
+    sol, cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
+    return not torch.isnan(sol).any() and valid
+
 def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand'):
     """Generate random mechanism that is not locking or invalid.
     Parameters
@@ -1193,7 +1204,6 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     
     fixed_nodes = np.array(fixed_nodes)
     
-    solver = mechanism_solver()
     
     if strategy == 'srand':
         x = np.random.uniform(low=0.0,high=1.0,size=[n,2])
@@ -1201,7 +1211,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
         for i in range(4,n+1):
 
             sub_size = i
-            invalid = not solver.check(100,x[0:sub_size],C[0:sub_size,0:sub_size],motor,fixed_nodes[np.where(fixed_nodes<sub_size)],False)
+            invalid = not check(C, x, motor, fixed_nodes, 50)
 
             co = 0
 
@@ -1211,8 +1221,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
                 else:
                     x[0:sub_size] = np.random.uniform(low=0.0,high=1.0,size=[sub_size,2])
 
-                invalid = not solver.check(50,x[0:sub_size],C[0:sub_size,0:sub_size],motor,fixed_nodes[np.where(fixed_nodes<sub_size)],False)
-
+                invalid = not check(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], 50)
                 co+=1
 
                 if co == 100:
@@ -1231,7 +1240,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     else:
         co = 0
         x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
-        invalid = not solver.check(50,x,C,motor,fixed_nodes,False)
+        invalid = not check(C, x, motor, fixed_nodes, 50)
 
         res = sort_mech(C, x, motor,fixed_nodes)
         if res: 
@@ -1242,7 +1251,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
-            invalid = not solver.check(50,x,C,motor,fixed_nodes,False)
+            invalid = not check(C, x, motor, fixed_nodes, 50)
             co += 1
             
             if co>=1000:
