@@ -1730,7 +1730,7 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
-    valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    valid, _, _, _ = solve_mechanism(A, x0, fixed_nodes, motor, device = "cpu", timesteps = 2000)
     if not valid:
         print("Mechanism is invalid!")
         return
@@ -1805,7 +1805,7 @@ def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = n
 
 
 def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
-    valid, _, _, _ = solve_mechanism(A, x0, motor, fixed_nodes, device = "cpu", timesteps = 50)
+    valid, _, _, _ = solve_mechanism(A, x0, fixed_nodes, motor, device = "cpu", timesteps = 50)
     if not valid:
         print("Mechanism is invalid!")
         return
