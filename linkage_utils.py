@@ -320,7 +320,7 @@ def sort_mech(A, x0, motor,fixed_nodes):
 
  
 
-    if check and p.shape>1:
+    if check and len(p.shape)>1:
         fixed_nodes = np.where(nt[1:])[0]+1
         sorted_order = np.concatenate([[0,1],fixed_nodes,p[:,0]])
         A = A[sorted_order,:][:,sorted_order]
