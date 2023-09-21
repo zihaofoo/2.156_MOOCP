@@ -1433,13 +1433,13 @@ def evaluate_submission():
                 valid, CD, material, _ = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curves[i], device='cpu',timesteps=50)
                 
                 if valid:                    
-                    if CD<=0.2 and material<=5.0:
+                    if CD<=0.1 and material<=10.0:
                         F.append([CD,material])
             if len(F):            
                 if len(F)>1000:
                     print("Over 1000 linkages submitted! Truncating submission to first 1000.")
                     F=F[:1000]
-                scores.append(hyper_volume(np.array(F),[0.2,5.0]))
+                scores.append(hyper_volume(np.array(F),[0.1,10.0]))
             else:
                 scores.append(0)
         else:
@@ -1613,7 +1613,7 @@ def visualize_pareto_front(mechanisms,F,target_curve):
 
         # Solve
         valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curve, idx = target)
-
+        target_curve = get_oriented(target_curve)
         # Plot
         axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
         axs[i,1].scatter(sol[:,0],sol[:,1],s=2)
