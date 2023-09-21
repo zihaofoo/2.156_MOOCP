@@ -1201,7 +1201,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
         for i in range(4,n+1):
 
             sub_size = i
-            valid, _, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+            valid, _, _, _ = solve_mechanism(C, x, fixed_nodes, motor, device = "cpu", timesteps = 50)
             invalid = not valid
 
             co = 0
@@ -1212,7 +1212,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
                 else:
                     x[0:sub_size] = np.random.uniform(low=0.0,high=1.0,size=[sub_size,2])
 
-                valid, _, _, _  = solve_mechanism(C[0:sub_size,0:sub_size], x[0:sub_size], motor, fixed_nodes[np.where(fixed_nodes<sub_size)], device = "cpu", timesteps = 50)
+                valid, _, _, _  = solve_mechanism(C[0:sub_size,0:sub_size], x[0:sub_size], fixed_nodes[np.where(fixed_nodes<sub_size)], motor, device = "cpu", timesteps = 50)
                 invalid = not valid
                 co+=1
 
@@ -1232,7 +1232,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     else:
         co = 0
         x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
-        valid, _, _, _ = solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+        valid, _, _, _ = solve_mechanism(C, x, fixed_nodes, motor, device = "cpu", timesteps = 50)
         invalid = not valid
 
         res = sort_mech(C, x, motor,fixed_nodes)
@@ -1244,7 +1244,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
             invalid = True
         while invalid:
             x = np.random.uniform(low=0.1+0.25*co/1000,high=0.9-0.25*co/1000,size=[n,2])
-            valid, _, _, _= solve_mechanism(C, x, motor, fixed_nodes, device = "cpu", timesteps = 50)
+            valid, _, _, _= solve_mechanism(C, x, fixed_nodes, motor, device = "cpu", timesteps = 50)
             invalid = not valid
             co += 1
             
@@ -1608,7 +1608,7 @@ def visualize_pareto_front(mechanisms,F,target_curve):
         draw_mechanism_on_ax(C,x0,fixed_nodes,motor,axs[i,0])
 
         # Solve
-        valid, CD, mat, sol = evaluate_mechanism(C,x0,motor,fixed_nodes,target_curve)
+        valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curve)
 
         # Plot
         axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
