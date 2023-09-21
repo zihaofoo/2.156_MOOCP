@@ -1083,7 +1083,7 @@ def evaluate_mechanism(C,x0,fixed_nodes, motor, target_pc, idx=None,device='cpu'
 #         G = self.get_G(x0,C)
 #         return np.sum(G[np.logical_not(np.isinf(G))])    
 
-def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', show_progress=True):
+def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', scale=1, show_progress=True):
     """Fast generate a batch of random mechanisms that are not locking or invalid.
     Parameters
     ----------
@@ -1117,7 +1117,7 @@ def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy
     """
     
     
-    args = [(g_prob, n, N_min, N_max, strategy)]*N
+    args = [(g_prob, n, N_min, N_max, strategy, scale)]*N
     return run_imap_multiprocessing(auxilary, args, show_prog = show_progress)
 
 # Auxiary function for batch generator
@@ -1137,7 +1137,7 @@ def auxilary(intermidiate):
 #     sol, cos = solve_rev_vectorized_batch_wds(A,X,node_types,thetas)
 #     return not torch.isnan(sol).any() and valid
 
-def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand'):
+def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, scale=1, strategy='rand'):
     """Generate random mechanism that is not locking or invalid.
     Parameters
     ----------
@@ -1196,7 +1196,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     
     
     if strategy == 'srand':
-        x = np.random.uniform(low=0.0,high=1.0,size=[n,2])
+        x = np.random.uniform(low=0.0,high=scale,size=[n,2])
 
         for i in range(4,n+1):
 
@@ -1231,7 +1231,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
                     co = 0
     else:
         co = 0
-        x = np.random.uniform(low=0.05,high=0.95,size=[n,2])
+        x = np.random.uniform(low=0.05*scale,high=0.95*scale,size=[n,2])
         valid, _, _, _ = solve_mechanism(C, x, fixed_nodes, motor, device = "cpu", timesteps = 50)
         invalid = not valid
 
