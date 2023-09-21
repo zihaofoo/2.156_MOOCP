@@ -1675,7 +1675,6 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
             return [], False
         else:
             counter += 1
-    if len(path)
     return np.array(path), True
 
 def get_G(x0):
