@@ -1099,6 +1099,8 @@ def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy
             Maximum size of mechanims if n is not set. Default: 20
     strategy: str
             Either rand or srand. 'rand': fully random, 'srand': sequentially built random. Default: 'rand'
+    scale: float
+            Scale of the mechanism. Default: 1
     show_progress: Boolean
             If true will display progress bar. Deafault: True
     
@@ -1151,6 +1153,8 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, scale=1, strat
             Maximum size of mechanims if n is not set. Default: 20
     strategy: str
             Either rand or srand. 'rand': fully random, 'srand': sequentially built random. Default: 'rand'
+    scale: float
+            Scale of the mechanism. Default: 1
             
     Returns
     -------
@@ -1608,7 +1612,7 @@ def visualize_pareto_front(mechanisms,F,target_curve):
         draw_mechanism_on_ax(C,x0,fixed_nodes,motor,axs[i,0])
 
         # Solve
-        valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curve)
+        valid, CD, mat, sol = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curve, idx = target)
 
         # Plot
         axs[i,1].scatter(target_curve[:,0],target_curve[:,1],s=2)
