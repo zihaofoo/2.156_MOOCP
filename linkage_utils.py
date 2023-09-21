@@ -1169,7 +1169,7 @@ def random_generator_ns(g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand
     edges = [[0,1],[1,3],[2,3]]
     
     fixed_nodes = [0,2]
-    motor = [1,0]
+    motor = [0,1]
     
     node_types = np.random.binomial(1,g_prob,n-4)
     
