@@ -810,7 +810,7 @@ def evaluate_submission():
                 C,x0,fixed_nodes,motor,target = from_1D_representation(m)
 
                 # Solve
-                valid, CD, material, _ = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curves[i], device='cpu',timesteps=50)
+                valid, CD, material, _ = evaluate_mechanism(C,x0,fixed_nodes, motor, target_curves[i], target, device='cpu',timesteps=2000)
                 
                 if valid:                    
                     if CD<=0.1 and material<=10.0:
