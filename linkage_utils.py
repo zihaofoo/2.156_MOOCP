@@ -172,11 +172,11 @@ def solve_rev_vectorized_batch_wds(As,x0s,node_types,thetas):
 
         cos_list.append(cosphis.unsqueeze(1))
 
-        x0i1 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.ones(shape=[x0s.shape[0]]).astype(np.int32)]
-        x0i0 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.zeros(shape=[x0s.shape[0]]).astype(np.int32)]
+        x0i1 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.ones(shape=[x0s.shape[0]]).astype(int)]
+        x0i0 = x0s[np.arange(x0s.shape[0]),inds[:,0],np.zeros(shape=[x0s.shape[0]]).astype(int)]
 
-        x0j1 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.ones(shape=[x0s.shape[0]]).astype(np.int32)]
-        x0j0 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.zeros(shape=[x0s.shape[0]]).astype(np.int32)]
+        x0j1 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.ones(shape=[x0s.shape[0]]).astype(int)]
+        x0j0 = x0s[np.arange(x0s.shape[0]),inds[:,1],np.zeros(shape=[x0s.shape[0]]).astype(int)]
 
         x0k1 = x0s[:,k,1]
         x0k0 = x0s[:,k,0]
@@ -401,7 +401,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
         tr = (tr[0]+np.pi,tr[1],tr[2])
         matched_curve = matched_curve_180
 
-    target = torch.Tensor(matched_curve.astype(np.float32)).to(device).unsqueeze(0)
+    target = torch.Tensor(matched_curve.astype(float)).to(device).unsqueeze(0)
 
     def CD_fn(x0_inp):
         x0_in = np.reshape(x0_inp,x0.shape)[sorted_order]/multiplier
@@ -898,9 +898,9 @@ def from_1D_representation(mechanism):
     # Extract mechanism components
     C = mechanism[0:N**2].reshape([N,N])
     x0 = mechanism[N**2:N**2 + 2*N].reshape([N,2])
-    fixed_nodes = np.where(mechanism[N**2 + 2*N:N**2 + 3*N])[0].astype(np.int)
-    motor = mechanism[N**2 + 3*N:N**2 + 3*N+2].astype(np.int)
-    target = mechanism[-1].astype(np.int)
+    fixed_nodes = np.where(mechanism[N**2 + 2*N:N**2 + 3*N])[0].astype(int)
+    motor = mechanism[N**2 + 3*N:N**2 + 3*N+2].astype(int)
+    target = mechanism[-1].astype(int)
     
     return C,x0,fixed_nodes,motor,target
 
@@ -934,7 +934,7 @@ def get_population_csv(file_name):
     with open(file_name,'r') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         for row in csv_reader:
-            population.append(np.array(row).astype(np.float32))
+            population.append(np.array(row).astype(float))
     return population
 
 def is_pareto_efficient(costs, return_mask = True):
@@ -1132,7 +1132,7 @@ def solve_rev_vectorized(path,x0,G,motor,fixed_nodes,thetas):
         x[k] = np.squeeze(R @ np.expand_dims(scaled_ij,-1)) + x[i]
         
     kk = (kk!=-1.0) + kk    
-    return x, state == 0.0, kk.astype(np.int32)
+    return x, state == 0.0, kk.astype(int)
 
 def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
     
@@ -1188,7 +1188,7 @@ def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = n
     if solve:
         path = find_path(A,motor,fixed_nodes)[0]
         G = get_G(x0)
-        x,c,k =  solve_rev_vectorized(path.astype(np.int32), x0, G, motor, fixed_nodes,thetas)
+        x,c,k =  solve_rev_vectorized(path.astype(int), x0, G, motor, fixed_nodes,thetas)
         x = np.swapaxes(x,0,1)
         if np.sum(c) == c.shape[0]:
             for i in range(A.shape[0]):
@@ -1262,7 +1262,7 @@ def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, 
     if solve:
         path = find_path(A,motor,fixed_nodes)[0]
         G = get_G(x0)
-        x,c,k =  solve_rev_vectorized(path.astype(np.int32), x0, G, motor, fixed_nodes,thetas)
+        x,c,k =  solve_rev_vectorized(path.astype(int), x0, G, motor, fixed_nodes,thetas)
         x = np.swapaxes(x,0,1)
         if np.sum(c) == c.shape[0]:
             for i in range(A.shape[0]):
