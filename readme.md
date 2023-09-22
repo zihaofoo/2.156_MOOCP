@@ -21,8 +21,7 @@ This challenge problem is focused on synthesizing planar linkage mechanisms such
 Run:
 ```
 conda create -n <environment-name> 
-conda install pip
-pip install -r requirements.txt
+conda create -f environment.yml -n <environment-name> 
 ```
 
 to make the correct enivronment in conda
