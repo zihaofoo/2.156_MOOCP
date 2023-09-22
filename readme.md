@@ -12,7 +12,7 @@ This challenge problem is focused on synthesizing planar linkage mechanisms such
 <li>pymoo >= 0.6</li>
 <li>matplotlib</li>
 <li>scipy</li>
-<li>scikit-learn</li>
+<li>pytorch</li>
 <li>svgpath2mpl</li>
 <li>tqdm</li>
 </ul>

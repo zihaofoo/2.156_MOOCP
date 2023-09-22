@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import multiprocessing as mp
 from tqdm import tqdm
-from sklearn.neighbors import NearestNeighbors
 import csv
 from pymoo.indicators.hv import HV
 import os
