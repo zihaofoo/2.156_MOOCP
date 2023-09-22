@@ -557,7 +557,7 @@ def evaluate_mechanism(C,x0,fixed_nodes, motor, target_pc, idx=None,device='cpu'
             CD = CD2
             sol = sol2
         
-        return True, CD, material, sol
+        return True, float(CD), float(material), sol
 
 def batch_random_generator(N, g_prob = 0.15, n=None, N_min=8, N_max=20, strategy='rand', scale=1, show_progress=True):
     """Fast generate a batch of random mechanisms that are not locking or invalid.
