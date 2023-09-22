@@ -459,7 +459,7 @@ def functions_and_gradients(C,x0,fixed_nodes,target_pc, motor, idx=None,device='
         if torch.isnan(material):
             return np.zeros_like(x0_inp)
 
-        return current_x0.grad.detach().cpu().numpy()[:,inverse_order].reshape(x0_inp.shape)
+        return current_x0.grad.detach().cpu().numpy()[inverse_order].reshape(x0_inp.shape)
 
     return True, CD_fn, mat_fn, CD_grad, mat_grad, matched_curve*multiplier
 
