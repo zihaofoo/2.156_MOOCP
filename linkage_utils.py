@@ -486,7 +486,7 @@ def solve_mechanism(C,x0,fixed_nodes, motor, device='cpu', timesteps=2000):
     material: float
             total length of all links in mechanism.
     """
-
+ 
     res = sort_mech(C, x0, motor,fixed_nodes)
     if res: 
         C, x0, fixed_nodes, sorted_order = res
@@ -1030,7 +1030,7 @@ def find_path(A, motor = [0,1], fixed_nodes=[0, 1]):
     valid:      bool
                 If the mechanism is valid
     """
-
+    
     path = []
     
     A,fixed_nodes,motor = np.array(A),np.array(fixed_nodes),np.array(motor)
@@ -1138,6 +1138,7 @@ def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = n
     
     valid, _, _, _ = solve_mechanism(A, x0, fixed_nodes, motor, device = "cpu", timesteps = 2000)
     if not valid:
+        
         print("Mechanism is invalid!")
         return
 
@@ -1211,12 +1212,13 @@ def draw_mechanism(A,x0,fixed_nodes,motor, highlight=100, solve=True, thetas = n
 
 
 def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, thetas = np.linspace(0,np.pi*2,200), def_alpha = 1.0, h_alfa =1.0, h_c = "#f15a24"):
+    print("1")
     valid, _, _, _ = solve_mechanism(A, x0, fixed_nodes, motor, device = "cpu", timesteps = 50)
     if not valid:
         print("Mechanism is invalid!")
         return
     # fig = plt.figure(figsize=(12,12))
-
+    print("2")
     def fetch_path():
         root = etree.parse(StringIO('<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 338"><defs><style>.cls-1{fill:#1a1a1a;stroke:#1a1a1a;stroke-linecap:round;stroke-miterlimit:10;stroke-width:20px;}</style></defs><path class="cls-1" d="M45.5,358.5l70.71-70.71M46,287.5H644m-507.61,71,70.72-70.71M223,358.5l70.71-70.71m20.18,70.72,70.71-70.71m13.67,70.7,70.71-70.71m20.19,70.72,70.71-70.71m15.84,70.71,70.71-70.71M345,39.62A121.38,121.38,0,1,1,223.62,161,121.38,121.38,0,0,1,345,39.62Z" transform="translate(-35.5 -29.62)"/></svg>')).getroot()
         view_box = root.attrib.get('viewBox')
@@ -1234,7 +1236,7 @@ def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, 
     p.vertices = (np.array([[np.cos(np.pi), -np.sin(np.pi)],[np.sin(np.pi), np.cos(np.pi)]])@p.vertices.T).T
     
 
-
+    print("3")
     A,x0,fixed_nodes,motor = np.array(A),np.array(x0),np.array(fixed_nodes),np.array(motor)
     
     x = x0
