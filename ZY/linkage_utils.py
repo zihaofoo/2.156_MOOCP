@@ -794,10 +794,10 @@ def evaluate_submission():
     target_curves = []
 
     # Read every file separately and append to the list
-    for i in range(6):
-        if not os.path.exists('./data/%i.csv'%(i)):
-            raise IOError('Could not find %i.csv in the data folder'%(i))
-        target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
+        for i in range(6):
+            if not os.path.exists('./data/%i.csv'%(i)):
+                raise IOError('Could not find %i.csv in the data folder'%(i))
+            target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
     
     
     for i in trange(6):
