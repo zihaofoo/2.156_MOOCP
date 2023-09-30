@@ -257,31 +257,6 @@ def plot_HV(F, ref):
     print('Hyper Volume ~ %f' %(hypervolume))
     plot_HV(F, ref_point)
 
-
-def calculate_hypervolume(pareto_front, reference_point):
-    """
-    Calculate the hypervolume of a Pareto front with respect to a reference point.
-
-    Parameters:
-    pareto_front (numpy.ndarray): The Pareto front points as a 2D numpy array.
-    reference_point (numpy.ndarray): The reference point (usually a point dominating the Pareto front).
-
-    Returns:
-    hypervolume (float): The hypervolume of the Pareto front.
-    """
-    dominated_points = pareto_front[pareto_front[:, 0] <= reference_point[0]]
-    hypervolume = 0.0
-
-    for i in range(len(dominated_points)):
-        # Calculate the volume of the dominated region
-        volume = 1.0
-        for j in range(len(reference_point)):
-            volume *= max(0, reference_point[j] - dominated_points[i, j])
-
-        hypervolume += volume
-
-    return hypervolume
-
 # Initialize an empty list to store target curves
 target_curves = []
 
@@ -290,7 +265,7 @@ for i in range(6):
     # Load data from each CSV file and append it to the list
     target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
 
-target_index = 3
+target_index = 1
 target_curve = np.array(target_curves[target_index])
 
 # to_final_representation(C,x0,fixed_nodes,motor,target)
@@ -300,10 +275,12 @@ target_curve = np.array(target_curves[target_index])
 # print('Hyper Volume ~ %f' %(hypervolume))
 # plot_HV(results.F, ref_point)
 
-n_nodes = np.arange(start=5, step=1, stop=12)
+n_nodes = np.arange(start=5, step=1, stop=6)
 hyp_vol = np.zeros(np.shape(n_nodes))
-num_MC = 10000
+num_MC = np.int_(1E6)
 mechanisms = []
+ref_point = np.array([10, 0.1])
+
 fig1, ax1 = plt.subplots(figsize = (10,10))
 cost_mat = np.zeros((num_MC, 2), dtype = float)
 for i2 in range(len(n_nodes)):
@@ -316,6 +293,13 @@ for i2 in range(len(n_nodes)):
 
         if i1 % 1000 == 0:
             print('n =', n_nodes[i2], 'iteration: ', i1)
+            # int_cost = cost_mat[:num_MC,:]
+            # pareto_mask = is_pareto_efficient(int_cost)
+            # pareto_front = int_cost[pareto_mask]
+            # ind = HV(ref_point)
+            # hypervolume = ind(pareto_front)
+            # print('Hyper Volume ~ %f' %(hypervolume))
+
 
     pareto_mask = is_pareto_efficient(cost_mat)
     pareto_front = cost_mat[pareto_mask]
@@ -326,6 +310,7 @@ for i2 in range(len(n_nodes)):
 
     ind = HV(ref_point)
     hypervolume = ind(pareto_front)
+    np.savetxt("Monte_Carlo.csv", np.array(mechanisms), delimiter=",")
 
     print('Hyper Volume ~ %f' %(hypervolume))
     hyp_vol[i2] = hypervolume
