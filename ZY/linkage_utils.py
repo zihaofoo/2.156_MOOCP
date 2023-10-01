@@ -304,7 +304,7 @@ def sort_mech(A, x0, motor,fixed_nodes):
         t = motor[0]
         motor[0] = motor[1]
         motor[1] = t
-
+    
     motor_first_order = np.arange(A.shape[0])
     motor_first_order = motor_first_order[motor_first_order!=motor[0]]
     motor_first_order = motor_first_order[motor_first_order!=motor[1]]
@@ -794,10 +794,10 @@ def evaluate_submission():
     target_curves = []
 
     # Read every file separately and append to the list
-        for i in range(6):
-            if not os.path.exists('./data/%i.csv'%(i)):
-                raise IOError('Could not find %i.csv in the data folder'%(i))
-            target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
+    for i in range(6):
+        if not os.path.exists('./data/%i.csv'%(i)):
+            raise IOError('Could not find %i.csv in the data folder'%(i))
+        target_curves.append(np.loadtxt('./data/%i.csv'%(i),delimiter=','))
     
     
     for i in trange(6):
@@ -1282,3 +1282,4 @@ def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, 
         
     ax.axis('equal')
     ax.axis('off')
+    plt.show()
