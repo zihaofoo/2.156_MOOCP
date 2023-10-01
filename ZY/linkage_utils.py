@@ -304,7 +304,7 @@ def sort_mech(A, x0, motor,fixed_nodes):
         t = motor[0]
         motor[0] = motor[1]
         motor[1] = t
-
+    
     motor_first_order = np.arange(A.shape[0])
     motor_first_order = motor_first_order[motor_first_order!=motor[0]]
     motor_first_order = motor_first_order[motor_first_order!=motor[1]]
@@ -1282,3 +1282,4 @@ def draw_mechanism_on_ax(A,x0,fixed_nodes,motor, ax, highlight=100, solve=True, 
         
     ax.axis('equal')
     ax.axis('off')
+    plt.show()
