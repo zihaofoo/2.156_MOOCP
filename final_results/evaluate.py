@@ -1,9 +1,9 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-from linkage_utils import evaluate_submission, draw_mechanism, solve_mechanism, to_final_representation, evaluate_mechanism, is_pareto_efficient, get_population_csv, from_1D_representation
+from linkage_utils import evaluate_submission, draw_mechanism, solve_mechanism, to_final_representation, evaluate_mechanism, is_pareto_efficient, get_population_csv, from_1D_representation, save_population_csv
 from pymoo.indicators.hv import HV
-
+import pandas as pd
 # evaluate_submission()
 
 
@@ -322,34 +322,65 @@ for i2 in range(len(n_nodes)):
 ax1.plot(n_nodes, hyp_vol)
 plt.show()
     """
+hyp = 0
 
-for i in range(6):
+for i in range(1):
     print(i)
     target_curve = np.array(target_curves[i])
     mechanisms = get_population_csv('./results/%i.csv'%i)
     temp = []        
     cost_mat = np.zeros((np.shape(mechanisms)[0], 2), dtype = float)
     i1 = 0
+    # save_population_csv('./results/' + np.str_(i) + '_final.csv', [mechanisms[1]])
+
     for m in mechanisms:
         # read the outputs
         C,x0,fixed_nodes,motor,target = from_1D_representation(m)
         valid, CD, material, sol = evaluate_mechanism(C, x0, fixed_nodes, motor, target_curve, idx=None,device='cpu',timesteps=2000)
         cost_mat[i1,:] = [material, CD]
         i1 = i1 + 1
+    
+    pareto_mask = is_pareto_efficient(cost_mat)
+    pareto_front = cost_mat[pareto_mask]
+    print('Number of linkages', np.shape(pareto_front))
+    ref_point = np.array([10, 0.1])
+    # hypervolume= calculate_hypervolume(pareto_front, ref_point)
 
-pareto_mask = is_pareto_efficient(cost_mat)
-pareto_front = cost_mat[pareto_mask]
+    ind = HV(ref_point)
+    hypervolume = ind(pareto_front)
+    output = np.zeros((np.shape(pareto_mask)[0], np.shape(mechanisms)[1]))
+    print('Hyper Volume ~ %f' %(hypervolume))
+    hyp = hyp + hypervolume
+    
+    temp = [] 
+    k=0       
+    for m in mechanisms:
+        C,x0,fixed_nodes,motor,target = from_1D_representation(m)
+        if pareto_mask[k] == True:
+            temp.append(to_final_representation(C,x0,fixed_nodes,motor,target))
+        k = k + 1
+    
+    save_population_csv('./results/' + np.str_(i) + '_final.csv', temp)
 
-# print('Pareto Front', pareto_front)
-ref_point = np.array([10, 0.1])
-# hypervolume= calculate_hypervolume(pareto_front, ref_point)
 
-ind = HV(ref_point)
-hypervolume = ind(pareto_front)
-# np.savetxt("Monte_Carlo.csv", np.array(mechanisms), delimiter=",")
+    # for i2 in range(np.shape(mechanisms)[0]):
+    #     if pareto_mask[i2] == True:
+    #         output[j1,:] = mechanisms[i2,:]
+    #         j1 = j1 + 1
+    # np.savetxt('./results/' + np.str_(i) + '_final.csv', output, delimiter=",")
 
-print('Hyper Volume ~ %f' %(hypervolume))
+    #save_population_csv('./results/' + np.str_(i) + '_final.csv', [mechanisms[pareto_mask]])
+    # Use boolean indexing to select mechanisms based on pareto_mask
+    # Convert pareto_mask to a 1D boolean array if it's not already
+    # pareto_mask_1d = pareto_mask[:, 0]  # Assuming pareto_mask is a 2D array
 
+    # # Use boolean indexing to select mechanisms based on pareto_mask
+    # selected_mechanisms = mechanisms[pareto_mask_1d]
+
+    # # Save the selected mechanisms
+    # save_population_csv('./results/' + np.str_(i) + '_final.csv', selected_mechanisms)
+
+print('Average:', hyp/6)
 
 
 
